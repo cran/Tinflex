@@ -1,0 +1,22 @@
+Source code:
+
+ - create hat in the following situation:
+
+    * T=log
+    * f is log-convex in unbounded domain [b,Inf)
+    * log-density(Inf) is less than 0 and larger than Inf 
+
+   same on (Inf,b]
+
+Tests:
+
+ - add more fancy examples
+
+Man pages:
+
+ - needs to be written
+ - find fancy and/or convincing examples
+
+ - there must no be any inflection point in intervals
+   which are eithe unbounded or where the density vanishes
+   at some boundary point!!

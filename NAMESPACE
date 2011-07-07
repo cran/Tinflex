@@ -1,0 +1,8 @@
+useDynLib(Tinflex)
+
+export(Tinflex.setup)
+export(Tinflex.sample)
+
+S3method(plot, Tinflex)
+S3method(print, Tinflex)
+
