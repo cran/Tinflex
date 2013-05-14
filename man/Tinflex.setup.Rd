@@ -181,11 +181,14 @@ Tinflex.setup(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
 }
 
 \references{
-  C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2011),
-  Transformed Density Rejection with Inflection Points.
+  C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2013),
+  Transformed Density Rejection with Inflection Points,
+  Statistics and Computing 23(2), 251--260,
+  DOI: 10.1007/s11222-011-9306-4
+  (see also 
   Research Report Series / Department of Statistics and Mathematics
   Nr. 110, Department of Statistics and Mathematics, WU Wien,
-  \url{http://epub.wu.ac.at/}.
+  \url{http://epub.wu.ac.at/}).
 }
 
 \seealso{

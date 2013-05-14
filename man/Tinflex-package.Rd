@@ -20,8 +20,8 @@
   \tabular{ll}{
     Package: \tab Tinflex       \cr
     Type:    \tab Package       \cr
-    Version: \tab 0.1           \cr
-    Date:    \tab 2011-07-07    \cr
+    Version: \tab 1.0           \cr
+    Date:    \tab 2013-05-14    \cr
     License: \tab GPL 2 or later\cr
   }
 
@@ -100,11 +100,14 @@
 }
 
 \references{
-  C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2011),
-  Transformed Density Rejection with Inflection Points.
+  C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2013),
+  Transformed Density Rejection with Inflection Points,
+  Statistics and Computing 23(2), 251--260,
+  DOI: 10.1007/s11222-011-9306-4
+  (see also 
   Research Report Series / Department of Statistics and Mathematics
   Nr. 110, Department of Statistics and Mathematics, WU Wien,
-  \url{http://epub.wu.ac.at/}.
+  \url{http://epub.wu.ac.at/}).
 }
 
 \seealso{
