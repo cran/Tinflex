@@ -1,6 +1,6 @@
-07db7bd6678411ccdf18d1559c26aa8a *DESCRIPTION
-7e4fa179e66e160e0c22ba0660638e58 *NAMESPACE
-0e434a5dffa9ef24ce89393936d71fe2 *NEWS
+4f2ebebf0c6ff0e87e0a9db245816ab2 *DESCRIPTION
+4917927f0c9657e4e16b2ab262484940 *NAMESPACE
+8cdd1dbd5f91e75ddbd4d337885832a6 *NEWS
 f0d0adcd4c38ad78be5263ab4ee1a26d *R/T.R
 3633c2510db3cdc8ed37804c481514ae *R/auxiliary.R
 18662ca5ab651bdde44d328ff16b65d9 *R/guidetable.R
@@ -11,7 +11,7 @@ a3e37a9e092ff758b2798fc46c7f8bd6 *R/print.R
 f8c757a09d6bf5dc42811b245156ddde *R/setup.R
 2c290c5127da7e0f5cd66057588dd50e *R/zzz.R
 c7ccb2edb6ee864ac27211ec26c09a1a *TODO
-fc898bffe245b58c91bcd58508c30149 *man/Tinflex-package.Rd
+9b21584a6e1b588fa3e4269acdf46304 *man/Tinflex-package.Rd
 17194a18377856177ca4ef7d35d73598 *man/Tinflex.sample.Rd
 2b7ccd04782d4aebd8080009acd9bc42 *man/Tinflex.setup.Rd
 89054e4229b19b9eef995e99eaf58260 *man/plot.Tinflex.Rd

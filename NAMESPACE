@@ -1,5 +1,8 @@
 useDynLib(Tinflex)
 
+importFrom("graphics", "lines", "plot")
+importFrom("stats", "runif")
+
 export(Tinflex.setup)
 export(Tinflex.sample)
 
