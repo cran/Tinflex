@@ -226,7 +226,7 @@ Tinflex.setup <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=
   ## C version:
   Acum <- numeric(n.ivs)
   gt <- integer(n.ivs)
-  A.ht.tot <- .Call("make_guide_table", params, Acum, gt, PACKAGE="Tinflex")
+  A.ht.tot <- .Call("make_guide_table", params, Acum, gt)
   
   ## Create S3 class that contains generator.
   generator <- list(ivs=params,          ## data for hat and squeeze

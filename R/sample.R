@@ -19,7 +19,7 @@ Tinflex.sample <- function(gen, n=1) {
   ## Return: random sample.
   ## ------------------------------------------------------------------------
 
-  .Call("Tinflex_sample", gen, n, PACKAGE="Tinflex")
+  .Call("Tinflex_sample", gen, n)
 }
 
 ## --------------------------------------------------------------------------

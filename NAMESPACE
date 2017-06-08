@@ -1,4 +1,5 @@
-useDynLib(Tinflex)
+
+useDynLib(Tinflex, .registration=TRUE, .fixes="C_")
 
 importFrom("graphics", "lines", "plot")
 importFrom("stats", "runif")
