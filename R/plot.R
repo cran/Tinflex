@@ -5,13 +5,14 @@
 #############################################################################
 
 
-plot.Tinflex <- function(x, from, to, is.trans=FALSE, ...) {
+plot.Tinflex <- function(x, from, to, is.trans=FALSE, n=501, ...) {
   ## ------------------------------------------------------------------------
   ## S3 method for plotting class 'Tinflex'.
   ## ------------------------------------------------------------------------
   ##   x        ... S3 object of class 'Tinflex'
   ##   from, to ... range over which the function will be plotted
   ##   is.trans ... whether transformed scale is used
+  ##   n        ... number plot points
   ##   ...      ... graphical parameters
   ## ------------------------------------------------------------------------
 
@@ -26,11 +27,11 @@ plot.Tinflex <- function(x, from, to, is.trans=FALSE, ...) {
   ## Plot (transformed) pdf.
   if (isTRUE(is.trans)) {
     Tpdf <- function(z) { Tf(x$lpdf, ivs["c",1], z) }
-    plot(Tpdf, from=from, to=to, n=501, col="blue", ...)
+    plot(Tpdf, from=from, to=to, n=n, col="blue", ...)
   }
   else {
     pdf <- function(z) { exp(x$lpdf(z)) }
-    plot(pdf, from=from, to=to, n=501, col="blue", ...)
+    plot(pdf, from=from, to=to, n=n, col="blue", ...)
   }
 
   ## Plot hat and squeeze.

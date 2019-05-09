@@ -1,6 +1,6 @@
 /*
  * -- Automatically created from 'setup.R'
- * Sat Sep 25 17:33:20 2010 
+ * Wed May  8 14:11:39 2019 
  */
 
 /* Number of data for each interval */
@@ -30,9 +30,10 @@ enum {
 	GEN_IVS = 0,
 	GEN_LPDF = 1,
 	GEN_A_HT_TOT = 2,
-	GEN_ENV = 3,
-	GEN_INIV = 4,
-	GEN_ACUM = 5,
-	GEN_GT = 6,
+	GEN_A_SQ_TOT = 3,
+	GEN_ENV = 4,
+	GEN_INIV = 5,
+	GEN_ACUM = 6,
+	GEN_GT = 7,
 };
 

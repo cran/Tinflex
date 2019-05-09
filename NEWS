@@ -1,4 +1,19 @@
 
+Version 1.4: 2019-05-08
+
+	- plot(): added argument 'n' for the number of plot points
+
+	- Tinflex.setup(): the generated generator object now contains
+	     field 'A.sq.tot' for the area below the squeeze
+
+        - Tinflex.setup(): added some checks for final hat function
+	
+
+Version 1.3: 2018-06-08
+
+	- fixed invalid argument check
+	
+
 Version 1.2: 2017-06-08
 
 	- Register native routines

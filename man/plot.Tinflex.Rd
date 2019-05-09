@@ -13,14 +13,15 @@
 }
 
 \usage{
-\S3method{plot}{Tinflex}(x, from, to, is.trans=FALSE, \dots)
+\S3method{plot}{Tinflex}(x, from, to, is.trans=FALSE, n=501, \dots)
 }
 
 \arguments{
   \item{x}{an object of class \code{"Tinflex"}.}
   \item{from,to}{the range over which the function will be plotted. (numeric)}
   \item{is.trans}{if \code{TRUE} then the transformed density and its
-    hat and squeezes are plotted. (logical)}  
+    hat and squeezes are plotted. (logical)}
+  \item{n}{the number of x values at which (transformed) PDF to evaluate. (integer)}
   \item{\dots}{arguments to be passed to methods, such as graphical
     parameters (see \code{\link{par}}). In particular the following
     argument may be useful:
