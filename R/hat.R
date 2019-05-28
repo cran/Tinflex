@@ -285,6 +285,12 @@ do.area <- function(cT, a,b,y, from,to) {
   ## Return: area.
   ## ------------------------------------------------------------------------
 
+  ## check for a new "empty" interval without data
+  if (is.na(a) && !is.nan(a)) {
+      ## We have a new interval without data.
+      return (Inf)
+  }
+
   ## Remove attributes (s.t. 'identical' works as expected).
   cT <- as.numeric(cT)
 
@@ -313,13 +319,25 @@ do.area <- function(cT, a,b,y, from,to) {
   }
   
   ## else: c!=0
-
+    
   ## The tangent to the transformed density must not vanish.
   ## Otherwise, we cannot construct the hat function.
-  ## Thus we simply return 'Inf' for the area.
-  if (!(is.TRUE(sign(cT)*(a+b*(from-y)) >= 0)) ||
-      !(is.TRUE(sign(cT)*(a+b*(to-y))   >= 0)) ) {
-    return (Inf)
+  if (!is.TRUE(sign(cT)*(a+b*(from-y)) >= 0) ||
+      !is.TRUE(sign(cT)*(a+b*(to-y))   >= 0) ) {
+      ## Case: numerical errors
+      if (is.infinite(a) && a < 0) {
+          ## underflow in computing Tf(x) (resulting in -Inf)
+          ## we assume that the area is 0
+          return (0)
+      }
+      ## else:
+      if (is.TRUE(a < 1e250 && is.infinite(b))) {
+          ## close to underflow when computing Tf(x) and overflow of tangent
+          ## we assume that the area is 0
+          return (0)
+      }
+      ## else: we have to split the interval
+      return (Inf)
   }
 
   ## Transform b.

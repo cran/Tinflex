@@ -1,4 +1,10 @@
 
+Version 1.5: 2019-05-28
+
+        - Tinflex.setup(): fixed some issues with numeric
+	    underflow/overflow during computation of T(f(x))
+	  
+
 Version 1.4: 2019-05-08
 
 	- plot(): added argument 'n' for the number of plot points
