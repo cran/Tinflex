@@ -12,13 +12,42 @@ print.Tinflex <- function(x, debug=FALSE, ...) {
   ##   debug ... if TRUE print intervals
   ## ------------------------------------------------------------------------
 
-  ## Prepare log-density.
-  lpdf.args <- paste(names(formals(x$lpdf)), collapse=",")
-  lpdf.body <- gsub("\\s", "", paste(deparse(x$lpdf), collapse=""), perl=TRUE)
-  lpdf.body <- gsub("^function\\(\\w+\\)", "", lpdf.body, perl=TRUE)
+  Tinflex.print(x, debug, classname="Tinflex", ...)
+}
 
+## --------------------------------------------------------------------------
+
+print.TinflexC <- function(x, debug=FALSE, ...) {
+  ## ------------------------------------------------------------------------
+  ## S3 method for printing class 'TinflexC'.
+  ## ------------------------------------------------------------------------
+  ##   x     ... S3 object of class 'Tinflex'
+  ##   debug ... if TRUE print intervals
+  ## ------------------------------------------------------------------------
+
+  genX <- Tinflex.C2R(x)
+  Tinflex.print(genX, debug, classname="TinflexC", ...)
+}
+
+## --------------------------------------------------------------------------
+
+Tinflex.print <- function(x, debug=FALSE, classname=NULL,...) {
+  ## ------------------------------------------------------------------------
+  ## S3 method for printing class 'Tinflex' and 'TinflexC'.
+  ## ------------------------------------------------------------------------
+
+  ## Prepare log-density.
+  if (is(x$lpdf, "function")) {
+      lpdf.args <- paste(names(formals(x$lpdf)), collapse=",")
+      lpdf.body <- gsub("\\s", "", paste(deparse(x$lpdf), collapse=""), perl=TRUE)
+      lpdf.body <- gsub("^function\\(\\w+\\)", "", lpdf.body, perl=TRUE)
+  } else {
+      lpdf.args <- " "
+      lpdf.body <- "<none>"
+  }
+    
   ## Print on console.
-  cat("Object of class 'Tinflex':\n\n")
+  cat("Object of class '",classname,"':\n\n", sep="")
   cat("       log-density(",lpdf.args,") = ",lpdf.body,"\n\n", sep="")
 
   cat("       area below hat =",x$A.ht,"\n")
@@ -42,4 +71,3 @@ print.Tinflex <- function(x, debug=FALSE, ...) {
 }
 
 ## --------------------------------------------------------------------------
-

@@ -20,16 +20,19 @@
   \tabular{ll}{
     Package: \tab Tinflex       \cr
     Type:    \tab Package       \cr
-    Version: \tab 1.5           \cr
-    Date:    \tab 2019-05-28    \cr
+    Version: \tab 1.7           \cr
+    Date:    \tab 2021-02-08    \cr
     License: \tab GPL 2 or later\cr
   }
 
-  Package \pkg{Tinflex} serves two purposes:
+  Package \pkg{Tinflex} serves three purposes:
   \enumerate{
     \item The installed package provides a fast routine for
     sampling from any distribution that has a piecewise twice
     differentiable density function.
+
+    \item It provides C routines functions that could be used in
+    other packages (see the installed C header files).
 
     \item The \R source (including comments) presents all details of the
     general sampling method which are not entirely worked out in our
@@ -70,9 +73,20 @@
   }
 
   For further details see \code{\link{Tinflex.setup}}.
+
+  There are two different implementation:
+  Routine \code{\link{Tinflex.setup}} is implemented mainly in \R and
+  serves (together with \code{Tinflex:::Tinflex.sample.R}) as
+  a reference implementation of the published algorithm.
+  Nevertheless, the sampling routine \code{\link{Tinflex.sample}} runs
+  quite fast.
+
+  Routine \code{\link{Tinflex.setup.C}} on the other hand is implemented
+  entirely in C. So it also allows to link to the underlying C code from
+  other packages.
 }
 
-\section{Warning }{
+\section{Warning}{
   It is very important to note that the user is responsible for the
   correctness of the supplied arguments. Since the algorithm works (in theory)
   for all distributions with piecewise twice differentiable density
@@ -80,12 +94,6 @@
   recommended that the user inspect the generator object visually by
   means of the \code{plot} method (see \code{\link{plot.Tinflex}} for
   details).
-
-  Package \pkg{\link[rvgtest]{rvgtest}} provides a test suite for
-  non-uniform random number generators.
-  (Approximate distribution functions are available through
-  method \code{\link[Runuran]{pinv.new}} in package
-  \pkg{\link[Runuran]{Runuran}}.)
 }
 
 \note{
@@ -103,11 +111,11 @@
   C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2013),
   Transformed Density Rejection with Inflection Points,
   Statistics and Computing 23(2), 251--260,
-  DOI: 10.1007/s11222-011-9306-4
+  \doi{10.1007/s11222-011-9306-4}
   (see also 
   Research Report Series / Department of Statistics and Mathematics
   Nr. 110, Department of Statistics and Mathematics, WU Wien,
-  \url{http://epub.wu.ac.at/}).
+  \url{https://epub.wu.ac.at/id/eprint/3158}).
 }
 
 \seealso{

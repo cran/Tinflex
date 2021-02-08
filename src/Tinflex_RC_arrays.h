@@ -1,6 +1,7 @@
 /*
  * -- Automatically created from 'setup.R'
- * Wed May  8 14:11:39 2019 
+ * -- by '../devel/make_Tinflex_RC_arrays_h.R'
+ * Fri Jul  5 11:41:12 2019 
  */
 
 /* Number of data for each interval */

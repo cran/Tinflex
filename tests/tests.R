@@ -7,6 +7,8 @@
 ## Load libraries -----------------------------------------------------------
 
 require(Tinflex)
+source("ftable.R")
+source("chisq.R")
 
 ## Constants ----------------------------------------------------------------
 
@@ -37,18 +39,15 @@ options(digits = 15)
 
 ## Load auxiliary libraries -------------------------------------------------
 
-if (  
-    ## Routines for testing non-uniform random variate generators.
-    require(rvgtest) &&
-    ## Function for approximate quantile function.
+if ( ## Function for approximate quantile function.
     require(Runuran) ) {
 
-  ## We have all required libraries.
-  have.UNURAN <- TRUE
+    ## We have all required libraries.
+    have.UNURAN <- TRUE
 
 } else {
-  warning("Packages 'Runuran' and 'rvgtest' needed for testing!")
-  have.UNURAN <- FALSE
+    warning("Package 'Runuran' needed for testing!")
+    have.UNURAN <- FALSE
 }
  
 ## Global variables ---------------------------------------------------------
@@ -60,86 +59,128 @@ time.start <- proc.time()
 pvals <- numeric(0)
 
 ## Number of compare tests that fail.
-comp.fail <- 0
+comp.sample.fail <- 0
+comp.object.fail <- 0
 
 ## Auxiliary functions ------------------------------------------------------
 
 ## Plot histogram and run GoF tests (only if 'Runuran' is installed). .......
-run.test <- function(gen, cT, lf, lb=-Inf, ub=Inf, plot=FALSE) {
-  ## Print generator in debugging mod.e
-  print(gen, debug=TRUE)
 
-  ## Plot density, hat and squeeze.
-  if (plot) {
-    plot(gen, from=max(lb,-3), to=min(ub,3), is.trans=FALSE, main=paste("c =",cT))
-    plot(gen, from=max(lb,-3), to=min(ub,3), is.trans=TRUE,  main=paste("c =",cT))
-  }
+run.test <- function(id, type, lf, dlf, d2lf, ib, cT, rho, plot=FALSE) {
+
+    ## lower and upper bound for domain
+    ib <- sort(ib)
+    lb <- ib[1]
+    ub <- ib[length(ib)]
+    
+    ## create Tinflex objects
+    genR <- Tinflex.setup(lf, dlf, d2lf, ib=ib, cT=cT, rho=rho)
+    genC <- Tinflex.setup.C(lf, dlf, d2lf, ib=ib, cT=cT, rho=rho)
+    genX <- Tinflex:::Tinflex.C2R(genC)
+
+    ## compare objects
+    if (!isTRUE(all.equal(genR, genX))) {
+        comp.object.fail <<- comp.object.fail + 1
+        cat(paste("Warning - FAIL - object!  [id=",id,"]\n",
+                  "genR and converted genC differ!\n"))
+        print(all.equal(genR,genX))
+        if (! isTRUE(all.equal(genR$gt, genX$gt))) {
+            cat ("guide table: sum of absolute differences =",sum(abs(genR$gt-genX$gt)),"\n")
+        }
+    }
+
+    ## Print generator in debugging mod.e
+    print(genR, debug=TRUE)
+
+    ## Plot density, hat and squeeze.
+    if (plot) {
+        plot(genR, from=max(lb,-3), to=min(ub,3), is.trans=FALSE, main=paste("c =",cT))
+        plot(genR, from=max(lb,-3), to=min(ub,3), is.trans=TRUE,  main=paste("c =",cT))
+    }
   
-  ## Compare R and C version of sampling routine.
-  if (n.comp > 0) {
-    set.seed(SEED)
-    x.R <- Tinflex:::Tinflex.sample.R(gen,n=n.comp)
-    set.seed(SEED)
-    x.C <- Tinflex.sample(gen,n=n.comp)
-    if (!identical(x.R,x.C)) {
-      comp.fail <<- comp.fail + 1
-      d <- x.R - x.C
-      cat(paste("Warning:!\n",
-                "R and C versions differ!\n",
+    if (n.comp > 0) {
+
+        ## Compare R and C version of sampling routine.
+        set.seed(SEED)
+        x.R <- Tinflex:::Tinflex.sample.R(genR,n=n.comp)
+        set.seed(SEED)
+        x.RC <- Tinflex.sample(genR,n=n.comp)
+        if (!isTRUE(all.equal(x.R,x.RC))) {
+            comp.sample.fail <<- comp.sample.fail + 1
+            d <- x.R - x.RC
+            cat(paste("Warning - FAIL - sample!  [id=",id,"]\n",
+                      "R and C versions differ!\n",
+                      "\tsample size =",n.comp,"\n",
+                      "\t  different =",length(d[d!=0]),"\n\n"))
+            cat("output of R version:\n")
+            print(x.R[d!=0])
+            cat("difference to C version:\n")
+            print(d[d!=0])
+            ## Remark: x.R and x.RC may differ due to different round-off errors
+            ## in the C and R version, resp.
+            ## Thus we only print a message.
+        }
+    
+        ## Compare Tinflex and TinflexC versions.
+        set.seed(SEED)
+        x.C <- Tinflex.sample.C(genC,n=n.comp)
+        if (!isTRUE(all.equal(x.R,x.C))) {
+            comp.sample.fail <<- comp.sample.fail + 1
+            d <- x.R - x.C
+            cat(paste("Warning - FAIL - sample!  [id=",id,"]\n",
+                "R and pure C versions differ!\n",
                 "\tsample size =",n.comp,"\n",
                 "\t  different =",length(d[d!=0]),"\n\n"))
-      cat("output of R version:\n")
-      print(x.R[d!=0])
-      cat("difference to C version:\n")
-      print(d[d!=0])
-      ## Remark: x.R and x.C may differ due to different round-off errors
-      ## in the C and R version, resp.
-      ## Thus we only print a warning.
+            cat("output of R version:\n")
+            print(x.R[d!=0])
+            cat("difference to pure C version:\n")
+            print(d[d!=0])
+        }
+
     }
-  }
   
-  ## Create a histgram and run GoF test (when Runuran is available).
-  if (isTRUE(have.UNURAN)) {
-    ## Set seed for tests.
-    set.seed(SEED)
-
-    ## Create frequency table (using packages 'Runuran' and 'rvgtest')
-    if (n.GoF < 1e7) {
-      m <- 1
-      n <- n.GoF
-    } else {
-      m <- round(n.GoF / 1e7)
-      n <- 1e7
-    }      
-    ug <- pinv.new(pdf=lf, lb=lb, ub=ub, islog=TRUE, center=0, uresolution=1.e-14)
-    tb <- rvgt.ftable(n=n, rep=m,
-                      rdist=function(n){Tinflex.sample(gen,n=n)},
-                      qdist=function(u){uq(ug,u)})
-
-    ## Plot histgram of random sample.
-    if (plot && n.hist > 0)
-      hist(Tinflex.sample(gen,n=n.hist), breaks=101, main=paste("c =",cT))
-
-    ## Plot frequency table,
-    if (plot) {
-      plot(tb, main=paste("c =",cT))
+    ## Create a histogram and run GoF test (when Runuran is available).
+    if (isTRUE(have.UNURAN)) {
+        ## Set seed for tests.
+        set.seed(SEED)
+        
+        ## Create frequency table (using packages 'Runuran')
+        if (n.GoF < 1e7) {
+            m <- 1
+            n <- n.GoF
+        } else {
+            m <- round(n.GoF / 1e7)
+            n <- 1e7
+        }      
+        ug <- pinv.new(pdf=lf, lb=lb, ub=ub, islog=TRUE, center=0, uresolution=1.e-14)
+        tb <- rvgt.ftable(n=n, rep=m,
+                          rdist=function(n){Tinflex.sample(genR,n=n)},
+                          qdist=function(u){uq(ug,u)})
+        
+        ## Plot histgram of random sample.
+        if (plot && n.hist > 0)
+            hist(Tinflex.sample(genR,n=n.hist), breaks=101, main=paste("c =",cT))
+        
+        ## Plot frequency table,
+        if (plot) {
+            plot(tb, main=paste("c =",cT))
+        }
+        
+        ## Run GoF test.
+        gof <- rvgt.chisq(tb)
+        print(gof)
+        if(! isTRUE(gof$pval[m] >= pval.threshold))
+            warning("[id=",id,"]  p-value too small. GoF test failed!")
+        
+        ## Store p-value.
+        pvals <<- append(pvals, gof$pval[m])
     }
-
-    ## Run GoF test.
-    gof <- rvgt.chisq(tb)
-    print(gof)
-    if(! isTRUE(gof$pval[m] >= pval.threshold))
-      warning("p-value too small. GoF test failed!")
-
-    ## Store p-value.
-    pvals <<- append(pvals, gof$pval[m])
-  }
-  else {
-    ## Package 'Runuran' or 'rvgtest' is not installed.
-    ## Thus we only plot a histgram.
-    if (plot && n.hist > 0)
-      hist(Tinflex.sample(gen,n=n.hist), breaks=101, main=paste("c =",cT))
-  }
+    else {
+        ## Package 'Runuran' is not installed.
+        ## Thus we only plot a histgram.
+        if (plot && n.hist > 0)
+            hist(Tinflex.sample(genR,n=n.hist), breaks=101, main=paste("c =",cT))
+    }
 }
 
 ## Test whether there is an error. ..........................................
@@ -147,7 +188,7 @@ is.error <- function (expr) { is(try(expr), "try-error") }
 
 
 #############################################################################
-## Check API
+## Check API -- R version
 #############################################################################
 
 lf <- function(x) { -x^4 + 5*x^2 - 4 }  ## = (1 - x^2) * (x^2 - 4)
@@ -180,6 +221,39 @@ if (! (is.error( Tinflex.setup(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf, ib=c(-Inf,0,1,In
 
 
 #############################################################################
+## Check API -- C version
+#############################################################################
+
+lf <- function(x) { -x^4 + 5*x^2 - 4 }  ## = (1 - x^2) * (x^2 - 4)
+dlf <- function(x) { 10*x - 4*x^3 }
+d2lf <- function(x) { 10 - 12*x^2 }
+
+if (! (is.error( Tinflex.setup.C() ) &&
+       is.error( Tinflex.setup.C(lpdf=1) )) )
+    stop("invalid 'lpdf' not detected")
+
+if (! (is.error( Tinflex.setup.C(lpdf=lf) ) &&
+       is.error( Tinflex.setup.C(lpdf=lf, dlpdf=1) )) )
+    stop("invalid 'dlpdf' not detected")
+
+if (! (is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf) ) &&
+       is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=1) )) )
+    stop("invalid 'd2lpdf' not detected")
+
+if (! (is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf) ) &&
+       is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf, ib=1) )) )
+    stop("invalid 'ib' not detected")
+
+if (! (is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf, ib=c(-Inf,0,Inf), cT="a") ) &&
+       is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf, ib=c(-Inf,0,Inf), cT=c(-0.5,0,-0.5)) )) )
+    stop("invalid 'cT' not detected")
+
+if (! (is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf, ib=c(-Inf,0,1,Inf), cT=c(-2,0,-0.5)) ) &&
+       is.error( Tinflex.setup.C(lpdf=lf, dlpdf=dlf, d2lpdf=d2lf, ib=c(-Inf,0,1,Inf), cT=c(0,-0.5,-2)) )) )
+    stop("invalid 'cT' not detected")
+
+
+#############################################################################
 ## Distribution 1
 #############################################################################
 
@@ -193,102 +267,75 @@ d2lf <- function(x) { 10 - 12*x^2 }
 ## inflection points: -1.7620, -1.4012, 1.4012, 1.7620
 cT <- 1.5
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|1.5", type=1, lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
 
 ## c = 1 --------------------------------------------------------------------
 ## inflection points: -1.8018, -1.3627, 1.3627, 1.8018
 cT <- 1
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|1",  type=1, lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
 
 ## c = 0.5 ------------------------------------------------------------------
 ## inflection points: -1.8901, -1.2809, 1.2809, 1.8901
 cT <- 0.5
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|0.5", type=1, lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
 
 ## c = 0.1 ------------------------------------------------------------------
 ## inflection points: -2.2361, -1.0574, 1.0574, -2.2361
 cT <- 0.1
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|0.1", type=1, lf, dlf, d2lf, ib=c(-3,-1.5,0,1.5,3), cT=cT, rho=rho)
 
 ## c = 0 --------------------------------------------------------------------
 ## inflection points: -0.9129, 0.9129
 cT <- 0
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-1,0,-1,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-2,ub=1.5)
+run.test(id="1|0a", type=1, lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
+run.test(id="1|0b", type=1, lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
+run.test(id="1|0c", type=1, lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
 
 ## c = -0.2 -----------------------------------------------------------------
 ## inflection points: -0.4264, 0.4264
 cT <- -0.2
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-2,ub=1.5)
+run.test(id="1|-0.2a", type=1, lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
+run.test(id="1|-0.2b", type=1, lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
+run.test(id="1|-0.2c", type=1, lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
 
 ## c = -0.5 -----------------------------------------------------------------
 ## inflection points: -0.4264, 0.4264
 cT <- -0.5
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-2,ub=1.5)
+run.test(id="1|-0.5a", type=1, lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
+run.test(id="1|-0.5b", type=1, lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
+run.test(id="1|-0.5c", type=1, lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
 
 ## c = -0.9 -----------------------------------------------------------------
 ## inflection points: -0.4264, 0.4264
 cT <- -0.9
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
-run.test(gen,cT,lf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-2,ub=1.5)
+run.test(id="1|-0.9a", type=1, lf, dlf, d2lf, ib=c(-Inf,-2.1,-1.05,0.1,1.2,2,Inf), cT=cT, rho=rho)
+run.test(id="1|-0.9b", type=1, lf, dlf, d2lf, ib=c(-Inf,-1,0,1,Inf), cT=cT, rho=rho)
+run.test(id="1|-0.9c", type=1, lf, dlf, d2lf, ib=c(-2,0,1.5), cT=cT, rho=rho)
 
 ## c = -1 -------------------------------------------------------------------
 ## inflection points: -0.3094, -0.3094
 cT <- -1
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-2.1,-1.05,0.1,1.2,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|-1", type=1, lf, dlf, d2lf, c(-3,-2.1,-1.05,0.1,1.2,3), cT=cT, rho=rho)
 
 ## c = -1.5 -----------------------------------------------------------------
 ## inflection points: -0.2546, 0.2546
 cT <- -1.5
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-2.1,-1.05,0.1,1.2,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|-1.5", type=1, lf, dlf, d2lf, ib=c(-3,-2.1,-1.05,0.1,1.2,3), cT=cT, rho=rho)
 
 ## c = -2 -------------------------------------------------------------------
 ## inflection points: -0.2213, 0.2213
 cT <- -2
 
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-3,-2.1,-1.05,0.1,1.2,3), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="1|-2", type=1, lf, dlf, d2lf, ib=c(-3,-2.1,-1.05,0.1,1.2,3), cT=cT, rho=rho)
 
 
 #############################################################################
@@ -317,133 +364,110 @@ ivb.4 <- c(-3, -1+2^(-52), 1e-20, 1-2^(-53), 3)
 cT <- 2
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|2a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
-rm(gen)
+run.test(id="2|2b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 ## c = 1.5 ------------------------------------------------------------------
 ## inflection points: -1.1993, -0.8067, 0.8067, 1.1993
 cT <- 1.5
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|1.5a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|1.5b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 ## c = 1 --------------------------------------------------------------------
 ## inflection points: -1.2418, -0.7709, -0.7709, 1.2418
 cT <- 1
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|1a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|1b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 ## c = 0.5 ------------------------------------------------------------------
 ## inflection points: -1.3345, -0.7071, 0.7071, 1.3345
 cT <- 0.5
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|0.5a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3, ub=3)
+run.test(id="2|0.5b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 ## c = 0 --------------------------------------------------------------------
 ## inflection points: -0.5774, 0.5774, 
 cT <- 0
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|0a", type=2, lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|0b", type=2, lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
 
 ## c = -0.2 -----------------------------------------------------------------
 ## inflection points: -0.5076, 0.5076
 cT <- -0.2
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|-0.2a", type=2, lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|-0.2b", type=2, lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
 
 ## c = -0.5 -----------------------------------------------------------------
 ## inflection points: -0.4180, 0.4180
 cT <- -0.5
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|-0.5a", type=2, lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|-0.5b", type=2, lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
 
 ## c = -0.9 -----------------------------------------------------------------
 ## inflection points: -0.3404, 0.3404
 cT <- -0.9
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|-0.9a", type=2, lf, dlf, d2lf, ib=ivb.1, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="2|-0.9b", type=2, lf, dlf, d2lf, ib=ivb.2, cT=cT, rho=rho)
 
 ## c = -1 -------------------------------------------------------------------
 ## inflection points: -0.3264, 0.3264
 cT <- -1
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="2|-1a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="2|-1b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 ## c = -1.1 ------------------------------------------------------------------
 ## inflection points: -0.3139, 0.3139
 cT <- -1.1
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="2|-1.1a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="2|-1.1b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 ## c = -2 --------------------------------------------------------------------
 ## inflection points: -0.2412, 0.2412
 cT <- -2
 
 ## slope = 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="2|-2a", type=2, lf, dlf, d2lf, ib=ivb.3, cT=cT, rho=rho)
 
 ## slope ~ 0
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="2|-2b", type=2, lf, dlf, d2lf, ib=ivb.4, cT=cT, rho=rho)
 
 rm(ivb.1, ivb.2, ivb.3, ivb.4)
 
@@ -463,77 +487,53 @@ d2lf <- function(x) { -(4*x^6+12*x^2)/(x^8-2*x^4+1) }
 ## c = 2   ------------------------------------------------------------------
 ## inflection points: -0.8091, [ 0 ], 0.8091
 cT <- 2
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.9,-0.5,0.5,0.9,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|2", type=3, lf, dlf, d2lf, ib=c(-1,-0.9,-0.5,0.5,0.9,1), cT=cT, rho=rho)
 
 ## c = 1.5 ------------------------------------------------------------------
 ## inflection points: -0.8801, [ 0 ], 0.8801
 cT <- 1.5
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.9,-0.5,0.5,0.9,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|1.5", type=3, lf, dlf, d2lf, ib=c(-1,-0.9,-0.5,0.5,0.9,1), cT=cT, rho=rho)
 
 ## c = 1 --------------------------------------------------------------------
 ## inflection points: [ 0 ]
 cT <- 1
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|1", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = 0.5 ------------------------------------------------------------------
 cT <- 0.5
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|0.5", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = 0.1 ------------------------------------------------------------------
 cT <- 0.1
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|0.1", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = 0 --------------------------------------------------------------------
 cT <- 0
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|0", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = -0.2 -----------------------------------------------------------------
 cT <- -0.2
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|-0.2", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = -0.5 -----------------------------------------------------------------
 cT <- -0.5
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|-0.5", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = -0.9 -----------------------------------------------------------------
 cT <- -0.9
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|-0.9", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = -1 -------------------------------------------------------------------
 cT <- -1
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|-1", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = -1.5 -----------------------------------------------------------------
 cT <- -1.5
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|-1.5", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 ## c = -2 -------------------------------------------------------------------
 cT <- -2
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
+run.test(id="3|-2", type=3, lf, dlf, d2lf, ib=c(-1,-0.5,0,0.5,1), cT=cT, rho=rho)
 
 
 #############################################################################
@@ -548,10 +548,7 @@ d2lf <- function(x) { 1/(2*x^2) }
 
 ## c = -1.5 -----------------------------------------------------------------
 cT <- -1.5
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-1,0,1), cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-1,ub=1)
-
+run.test(id="4|-1.5", type=4, lf, dlf, d2lf, ib=c(-1,0,1), cT=cT, rho=rho)
 
 #############################################################################
 ## Distribution 5
@@ -561,19 +558,17 @@ run.test(gen,cT,lf,lb=-1,ub=1)
 lf <- function(x) { -2*x^4 + 4*x^2 } 
 dlf <- function(x) { -8*x^3 + 8*x }
 d2lf <- function(x) { -24*x^2+8 }
+## Remark: same as Distribution 2
+
 ## extrema: -1, 0, 1
 
 cT <- c(-0.5, 2, -2, 0.5, -1, 0)
 ib <- c(-Inf,-2, -1,   0,  1, 2, Inf)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ib, cT=cT, rho=rho)
-run.test(gen,cT,lf)
+run.test(id="5|multa", type=2, lf, dlf, d2lf, ib=ib, cT=cT, rho=rho)
 
 cT <- c(-0.5, 2, -2, 0.5, -1, 0)
 ib <- c(  -3,-2, -1,   0,  1, 2, 3)
-
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=ib, cT=cT, rho=rho)
-run.test(gen,cT,lf,lb=-3,ub=3)
+run.test(id="5|multb", type=2, lf, dlf, d2lf, ib=ib, cT=cT, rho=rho)
 
 rm(cT, ib)
 
@@ -591,9 +586,7 @@ dlf <- function(x) { 12*x-4*x^3 }
 d2lf <- function(x) { 12-12*x^2 }
 
 ## inflection points: -1, 1
-gen <- Tinflex.setup(lf, dlf, d2lf, ib=c(-Inf,-2,-1,0,1,2,Inf), cT=cT, rho=rho)
-print(gen)
-run.test(gen,cT,lf)
+run.test(id="6|", type=6, lf, dlf, d2lf, ib=c(-Inf,-2,-1,0,1,2,Inf), cT=cT, rho=rho)
 
 
 #############################################################################
@@ -610,8 +603,10 @@ summary(pvals)
 if (length(pvals)>0)
   ks.test(x=pvals, y="punif", alternative = "greater")
 
-## Print number of tests where R and C code return (slightly) different results.
-comp.fail
+## Print number of tests where different implemenations return different results.
+cat("Random samples: Number of fails =",comp.sample.fail,"\n\n")
+
+cat("Tinflex objects: Number of fails =",comp.object.fail,"\n\n")
 
 ## Stop timer.
 run.time <- (proc.time() - time.start)[3]  ## "elapsed" time

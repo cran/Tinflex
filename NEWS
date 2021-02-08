@@ -1,4 +1,19 @@
 
+Version 1.6: 2021-02-08
+
+	- new function Tinflex.setup.C():
+	  the setup routine is implemented in pure R code.
+	  The function returns an object of class "TinflexC"
+	  (instead of class "Tinflex").
+
+	- new function Tinflex.sample.C():
+	  sampling routine for objects of class "TinflexC"
+	  (However, routine Tinflex.sampling() also does work).
+
+	- The C routines are now exported at C level and can be linked
+          into other R packages.
+
+
 Version 1.5: 2019-05-28
 
         - Tinflex.setup(): fixed some issues with numeric

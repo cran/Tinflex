@@ -2,22 +2,25 @@
 
 \name{plot.Tinflex}
 \alias{plot.Tinflex}
+\alias{plot.TinflexC}
 
 \title{
-  Plot Tinflex Generator Object
+  Plot Tinflex Generator Objects
 }
 
 \description{
-  Plotting method for generator objects of class \code{"Tinflex"}.
+  Plotting methods for generator objects of classes
+  \code{"Tinflex"} and \code{"TinflexC"}.
   The plot shows the (transformed) density, hat and squeeze.
 }
 
 \usage{
 \S3method{plot}{Tinflex}(x, from, to, is.trans=FALSE, n=501, \dots)
+\S3method{plot}{TinflexC}(x, from, to, is.trans=FALSE, n=501, \dots)
 }
 
 \arguments{
-  \item{x}{an object of class \code{"Tinflex"}.}
+  \item{x}{an object of class \code{"Tinflex"} or \code{"TinflexC"}.}
   \item{from,to}{the range over which the function will be plotted. (numeric)}
   \item{is.trans}{if \code{TRUE} then the transformed density and its
     hat and squeezes are plotted. (logical)}
@@ -34,7 +37,8 @@
 
 \details{
   This is the \code{\link{print}} method for objects of class
-  \code{"Tinflex"}. It plots the given density function (blue) in the
+  \code{"Tinflex"} or \code{"TinflexC"}.
+  It plots the given density function (blue) in the
   domain (\code{from},\code{to}) as well as hat function (red) and
   squeeze (green) of the acceptance-rejection algorithm.
   If \code{is.trans} is set to \code{TRUE}, then density function, hat

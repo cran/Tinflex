@@ -19,7 +19,11 @@ Tinflex.sample <- function(gen, n=1) {
   ## Return: random sample.
   ## ------------------------------------------------------------------------
 
-  .Call("Tinflex_sample", gen, n)
+  switch(class(gen),
+         "Tinflex"  = .Call("Tinflex_RC_sample", gen, n),
+         "TinflexC" = .Call("Tinflex_C_sample", gen$Cgen, n),
+         stop("Argument 'gen' is invalid")
+  )
 }
 
 ## --------------------------------------------------------------------------

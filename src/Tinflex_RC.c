@@ -1,9 +1,10 @@
-/*****************************************************************************
- *
- *  Sampling routine for generator.
- *  (C version)
- *
- *****************************************************************************/
+/*****************************************************************************/
+/*                                                                           */
+/*  Tinflex_RC                                                               */
+/*  Setup and sampling routine for generator                                 */
+/*  (C version using R structure)                                            */
+/*                                                                           */
+/*****************************************************************************/
 
 /*---------------------------------------------------------------------------*/
 /* header files */
@@ -12,8 +13,9 @@
 #include <Rmath.h>
 #include <Rdefines.h>
 
-#include "Tinflex.h"
-#include "Tinflex_source.h"
+#include "Tinflex_RC.h"
+#include "Tinflex_RC_arrays.h"
+#include "Tinflex_lib_shared_private.h"
 
 /*---------------------------------------------------------------------------*/
 /* Prototypes of private functions                                           */
@@ -23,25 +25,10 @@ static double logpdf( SEXP lpdf, double x, SEXP env );
 /* Evaluate log-density and its derivatives                                  */
 /*---------------------------------------------------------------------------*/
 
-static double Tinv( double cT, double x);
-/*---------------------------------------------------------------------------*/
-/* Compute inverse transformation.                                           */
-/*---------------------------------------------------------------------------*/
-
-static double FT( double cT, double x);
-/*---------------------------------------------------------------------------*/
-/* Compute antiderivative of inverse transformation.                         */
-/*---------------------------------------------------------------------------*/
-
-static double FTinv( double cT, double x);
-/*---------------------------------------------------------------------------*/
-/* Compute inverse of antiderivative of inverse transformation.              */
-/*---------------------------------------------------------------------------*/
-
 /*****************************************************************************/
 
 SEXP
-make_guide_table (SEXP sexp_ivs, SEXP sexp_Acum, SEXP sexp_gt)
+Tinflex_RC_make_guide_table (SEXP sexp_ivs, SEXP sexp_Acum, SEXP sexp_gt)
 /*---------------------------------------------------------------------------*/
 /* Create guide table for draw interval at random.                           */
 /* The result is stored in 'Acum' and 'gt'.                                  */
@@ -110,7 +97,7 @@ make_guide_table (SEXP sexp_ivs, SEXP sexp_Acum, SEXP sexp_gt)
 /*---------------------------------------------------------------------------*/
 
 SEXP
-Tinflex_sample (SEXP sexp_gen, SEXP sexp_n)
+Tinflex_RC_sample (SEXP sexp_gen, SEXP sexp_n)
 /*---------------------------------------------------------------------------*/
 /* Draw sample from Tinflex generator object.                                */
 /*                                                                           */
@@ -296,7 +283,7 @@ Tinflex_sample (SEXP sexp_gen, SEXP sexp_n)
   UNPROTECT(1);
   return sexp_res;
 
-} /* end of Tinflex_sample() */
+} /* end of Tinflex_RC_sample() */
 
 /*---------------------------------------------------------------------------*/
 
@@ -318,89 +305,5 @@ logpdf( SEXP lpdf, double x, SEXP env )
   UNPROTECT(2);
   return y;
 } /* end of logpdf() */
-
-/*---------------------------------------------------------------------------*/
-
-double
-Tinv( double cT, double x)
-/*---------------------------------------------------------------------------*/
-/* Compute inverse transformation.                                           */
-/*---------------------------------------------------------------------------*/
-{
-  if (cT == 0.)
-    /* Case: T(x) = log(x) */
-    return (exp(x));
-
-  if (cT == -0.5)
-    /* Case: T(x) = -1/sqrt(x) */
-    return (1/(x*x));
-  
-  if (cT == 1.)
-    /* Case: T(x) = -1/x */
-    return (x);
-
-  else {
-    /* Case: T(x) = sign(c) * x^c */
-    double s = (cT < 0.) ? -1. : 1; 
-    return (R_pow(s*x, 1/cT));
-  }
-} /* end of Tinv() */
-
-/*---------------------------------------------------------------------------*/
-
-double
-FT( double cT, double x)
-/*---------------------------------------------------------------------------*/
-/* Compute antiderivative of inverse transformation.                         */
-/*---------------------------------------------------------------------------*/
-{
-  if (cT == 0.)
-    /* Case: T(x) = log(x) */
-    return (exp(x));
-
-  if (cT == -0.5)
-    /* Case: T(x) = -1/sqrt(x) */
-    return (-1/x);
-  
-  if (cT == -1.)
-    /* Case: T(x) = -1/x */
-    return (-log(-x));
-
-  else {
-    /* Case: T(x) = sign(c) * x^c */
-    double s = (cT < 0.) ? -1. : 1; 
-    double xs = (s*x > 0.) ? s*x : 0.;
-    return (s * cT/(cT+1) * R_pow(xs, (cT+1)/cT));
-    /* Remark: By construction s*x should always be non-negative. */
-    /*         Thus if s*x < 0 we asume round-off errors.         */
-  }
-} /* end of FT() */
-
-/*---------------------------------------------------------------------------*/
-
-double
-FTinv( double cT, double x)
-/*---------------------------------------------------------------------------*/
-/* Compute inverse of antiderivative of inverse transformation.              */
-/*---------------------------------------------------------------------------*/
-{
-  if (cT == 0.)
-    /* Case: T(x) = log(x) */
-    return (log(x));
-
-  if (cT == -0.5)
-    /* Case: T(x) = -1/sqrt(x) */
-    return (-1/x);
-
-  if (cT == -1)
-    /* Case: T(x) = -1/x */
-    return (-exp(-x));
-
-  else {
-    /* Case: T(x) = sign(c) * x^c */
-    double s = (cT < 0.) ? -1. : 1; 
-    return (s * R_pow((cT+1)/cT * s * x, cT/(cT+1)));
-  }
-} /* end of FTinv() */
 
 /*---------------------------------------------------------------------------*/

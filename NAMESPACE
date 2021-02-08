@@ -2,11 +2,17 @@
 useDynLib(Tinflex, .registration=TRUE, .fixes="C_")
 
 importFrom("graphics", "lines", "plot")
+importFrom("methods", "is")
 importFrom("stats", "runif")
 
 export(Tinflex.setup)
 export(Tinflex.sample)
 
+export(Tinflex.setup.C)
+export(Tinflex.sample.C)
+
 S3method(plot, Tinflex)
 S3method(print, Tinflex)
+S3method(plot, TinflexC)
+S3method(print, TinflexC)
 

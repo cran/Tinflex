@@ -66,6 +66,9 @@ Tinflex.setup <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=
   ##   A.ht.tot ... total area below hat
   ##   A.sq.tot ... total area below squeeze
   ##   env      ... environment for evaluating log-density in C
+  ##   iniv     ... string that describes initial intervals
+  ##   Acum     ... cumulated areas
+  ##   gt       ... guide table
   ## -----------------------------------------------------------------------
 
   ## Check arguments.
@@ -156,7 +159,9 @@ Tinflex.setup <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=
   ## Compute parameters for hat and squeeze for initial intervals.
   for (i in 1:n.ivs) {
     params[,i] <- hat.iv(left=params[,i], right=params[,i+1], link=i+1)
+    ## print(params[,i])
   }
+  ## print(params[,n.ivs+1])
 
   ## Compute total areas for initial hat and squeeze.
   A.ht.tot <- sum(params["A.ht", 1:n.ivs])
@@ -242,7 +247,7 @@ Tinflex.setup <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=
   ## C version:
   Acum <- numeric(n.ivs)
   gt <- integer(n.ivs)
-  A.ht.tot <- .Call("make_guide_table", params, Acum, gt)
+  A.ht.tot <- .Call("Tinflex_RC_make_guide_table", params, Acum, gt)
   
   ## Create S3 class that contains generator.
   generator <- list(ivs=params,          ## data for hat and squeeze
