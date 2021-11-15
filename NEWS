@@ -1,4 +1,21 @@
 
+Version 1.8: 2021-11-15
+
+	- Tinflex.setup.C():
+	  Fixed issue with densities on bounded domains
+	  where the density vanishes on one boundary point and
+	  its derivative on the other one.
+
+	- new internal C functiond Tinflex_lib_sample_double():
+	  returns one random number of type double.
+	  This function is also exported at C level.
+
+
+Version 1.7: 2021-02-08
+
+	- fixed URL in man pages
+	
+
 Version 1.6: 2021-02-08
 
 	- new function Tinflex.setup.C():

@@ -91,7 +91,7 @@ run.test <- function(id, type, lf, dlf, d2lf, ib, cT, rho, plot=FALSE) {
 
     ## Print generator in debugging mod.e
     print(genR, debug=TRUE)
-
+    
     ## Plot density, hat and squeeze.
     if (plot) {
         plot(genR, from=max(lb,-3), to=min(ub,3), is.trans=FALSE, main=paste("c =",cT))
@@ -578,15 +578,49 @@ rm(cT, ib)
 ## Test density with infection point at interval boundary
 #############################################################################
 
-## c = 0 --------------------------------------------------------------------
-cT <- 0
-
 lf <- function(x) { -x^4+6*x^2 }
 dlf <- function(x) { 12*x-4*x^3 }
 d2lf <- function(x) { 12-12*x^2 }
 
+## c = 0 --------------------------------------------------------------------
+cT <- 0
+
 ## inflection points: -1, 1
 run.test(id="6|", type=6, lf, dlf, d2lf, ib=c(-Inf,-2,-1,0,1,2,Inf), cT=cT, rho=rho)
+
+
+#############################################################################
+## Distribution 7
+## Test density which is zero on boundary of domain (i.e., log-pdf = -Inf)
+#############################################################################
+
+lf <- function(x) { log(1-x^2) }
+dlf <- function(x) { -2*x/(1-x^2) }
+d2lf <- function(x) { -2*(1+x^2)/(1-x^2)^2 }
+
+## c = 0 --------------------------------------------------------------------
+cT <- 0
+
+## monotonically decreasing
+run.test(id="7|0", type=6, lf, dlf, d2lf, ib=c(0,1), cT=cT, rho=rho)
+
+## c = -0.5 --------------------------------------------------------------------
+cT <- -0.5
+
+## monotonically decreasing
+run.test(id="7|-0.5", type=6, lf, dlf, d2lf, ib=c(0,1), cT=cT, rho=rho)
+
+## c = -1 --------------------------------------------------------------------
+cT <- -1
+
+## monotonically decreasing
+run.test(id="7|-1", type=6, lf, dlf, d2lf, ib=c(0,1), cT=cT, rho=rho)
+
+## c = -1.5 --------------------------------------------------------------------
+cT <- -1.5
+
+## monotonically decreasing
+run.test(id="7|-1.5", type=6, lf, dlf, d2lf, ib=c(0,1), cT=cT, rho=rho)
 
 
 #############################################################################

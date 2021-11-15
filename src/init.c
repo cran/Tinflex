@@ -27,9 +27,10 @@ void R_init_Tinflex(DllInfo *dll)
 {
 
   /* Declare some C routines to be callable from other packages */
-  R_RegisterCCallable("Tinflex", "Tinflex_lib_setup",  (DL_FUNC) Tinflex_lib_setup);
-  R_RegisterCCallable("Tinflex", "Tinflex_lib_sample", (DL_FUNC) Tinflex_lib_sample);
-  R_RegisterCCallable("Tinflex", "Tinflex_lib_free",   (DL_FUNC) Tinflex_lib_free);
+  R_RegisterCCallable("Tinflex", "Tinflex_lib_setup",         (DL_FUNC) Tinflex_lib_setup);
+  R_RegisterCCallable("Tinflex", "Tinflex_lib_sample",        (DL_FUNC) Tinflex_lib_sample);
+  R_RegisterCCallable("Tinflex", "Tinflex_lib_sample_double", (DL_FUNC) Tinflex_lib_sample_double);
+  R_RegisterCCallable("Tinflex", "Tinflex_lib_free",          (DL_FUNC) Tinflex_lib_free);
 
   /* Register native routines */
   R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);

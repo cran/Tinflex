@@ -48,14 +48,14 @@ type.iv <- function(left, right) {
   
   ## Case: Unbounded domain.
   if ( is.infinite(left["x"])) {
-    if (is.TRUE(right["d2Tfx"] < 0 && right["dTfx"] > 0))
+    if (is.TRUE(right["d2Tfx"] < 0 && right["dTfx"] >= 0))
       return (IVa)
     else
       return (0)
   }
 
   if ( is.infinite(right["x"])) {
-    if (is.TRUE(left["d2Tfx"] < 0 && left["dTfx"] < 0))
+    if (is.TRUE(left["d2Tfx"] < 0 && left["dTfx"] <= 0))
       return (IVa)
     else
       return (0)
@@ -65,9 +65,9 @@ type.iv <- function(left, right) {
   ##       (and thus the log-density is -Inf).
   if ((is.TRUE(cT>0)  && identical(as.numeric(left["Tfx"]),0))    ||
       (is.TRUE(cT<=0) && identical(as.numeric(left["Tfx"]),-Inf)) ) {
-    if (is.TRUE(right["d2Tfx"] < 0 && right["dTfx"] > 0))
+    if (is.TRUE(right["d2Tfx"] < 0 && right["dTfx"] >= 0))
       return (IVa)
-    if (is.TRUE(right["d2Tfx"] > 0 && right["dTfx"] > 0))
+    if (is.TRUE(right["d2Tfx"] > 0 && right["dTfx"] >= 0))
       return (IVb)
     else
       return (0)
@@ -75,9 +75,9 @@ type.iv <- function(left, right) {
 
   if ((is.TRUE(cT>0)  && identical(as.numeric(right["Tfx"]),0))    ||
       (is.TRUE(cT<=0) && identical(as.numeric(right["Tfx"]),-Inf)) ) {
-    if (is.TRUE(left["d2Tfx"] < 0 && left["dTfx"] < 0))
+    if (is.TRUE(left["d2Tfx"] < 0 && left["dTfx"] <= 0))
       return (IVa)
-    if (is.TRUE(left["d2Tfx"] > 0 && left["dTfx"] < 0))
+    if (is.TRUE(left["d2Tfx"] > 0 && left["dTfx"] <= 0))
       return (IVb)
     else
       return (0)
@@ -166,11 +166,13 @@ hat.iv <- function(left, right, link) {
   
   ## Compute secant.
   R <- (right["Tfx"] - left["Tfx"]) / (right["x"] - left["x"])
-  if (is.TRUE(left["Tfx"] >= right["Tfx"])) 
+  if (is.TRUE(left["Tfx"] >= right["Tfx"])) {
     sc <- c( left["Tfx"], R, left["x"])
-  else
+  }
+  else {
     sc <- c( right["Tfx"], R, right["x"])
-  
+  }
+
   ## Case: unbounded domains.
   if (is.infinite(left["x"]) && identical(type, IVa)) {
     left[c("ht.a","ht.b","ht.y")] <- tr
@@ -227,7 +229,7 @@ hat.iv <- function(left, right, link) {
   ## Compute area below squeeze.
   A.sq <- area(left["c"], left["sq.a"], left["sq.b"], left["sq.y"], left["x"], right["x"])
   left["A.sq"] <- if (is.finite(A.sq)) {A.sq} else {0} 
-
+    
   ## Return vector with parameters.
   return (left)
 }
@@ -251,9 +253,10 @@ area <- function(cT, a,b,y, from,to) {
 
   ## ... and check result.
   
-  if (! is.finite(area))
+  if (! is.finite(area)) {
     ## We return Inf in all cases where 'area' is not finite (e.g. NaN or NA)
     area <- Inf
+  }
 
   if (area < 0) {
     ## Area is strictly negative.

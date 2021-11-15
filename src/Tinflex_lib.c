@@ -320,17 +320,17 @@ type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
 {
   double c = left->c;   /* parameter 'c' for interval. */
   double R;             /* slope of secant */
-  
+
   /* Case: Unbounded domain. */
   if ( ! R_FINITE(left->x)) {
-    if (right->d2Tfx < 0. && right->dTfx > 0.)
+    if (right->d2Tfx < 0. && right->dTfx >= 0.)
       return (type_IVa);
     else
       return (0);
   }
   
   if ( ! R_FINITE(right->x)) {
-    if (left->d2Tfx < 0. && left->dTfx < 0.)
+    if (left->d2Tfx < 0. && left->dTfx <= 0.)
       return (type_IVa);
     else
       return (0);
@@ -340,9 +340,9 @@ type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
   /*       (and thus the log-density is -Inf). */
   if ( (c > 0.  && left->Tfx == 0.)    ||
        (c <= 0. && left->Tfx <= R_NegInf) ) {
-    if (right->d2Tfx < 0. && right->dTfx > 0.)
+    if (right->d2Tfx < 0. && right->dTfx >= 0.)
       return (type_IVa);
-    if (right->d2Tfx > 0. && right->dTfx > 0.)
+    if (right->d2Tfx > 0. && right->dTfx >= 0.)
       return (type_IVb);
     else
       return (0);
@@ -350,9 +350,9 @@ type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
   
   if ((c > 0.  && right->Tfx == 0.)    ||
       (c <= 0. && right->Tfx <= R_NegInf) ) {
-    if (left->d2Tfx < 0. && left->dTfx < 0.)
+    if (left->d2Tfx < 0. && left->dTfx <= 0.)
       return (type_IVa);
-    if (left->d2Tfx > 0. && left->dTfx < 0.)
+    if (left->d2Tfx > 0. && left->dTfx <= 0.)
       return (type_IVb);
     else
       return (0);
@@ -422,10 +422,10 @@ area (double c, double a, double b, double y, double from, double to)
 /*---------------------------------------------------------------------------*/
 {
   double area;
-  
+
   /* Compute area ... */
   area = do_area(c,a,b,y,from,to);
-  
+
   /* ... and check result. */
   
   if (! R_FINITE(area)) {
@@ -590,8 +590,11 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
 
   /* macro for storing data in array */
 #define setarray(a, x,y,z) {(a)[0]=(x); (a)[1]=(y); (a)[2]=(z);}
+
 #define sethat(a) {left->ht_a = a[0]; left->ht_b = a[1]; left->ht_y = a[2];}
 #define setsqueeze(a) {left->sq_a = a[0]; left->sq_b = a[1]; left->sq_y = a[2];}
+
+#define sethatNA(a) {left->ht_a = NA_REAL; left->ht_b = NA_REAL; left->ht_y = NA_REAL;}
 #define setsqueezeNA() {left->sq_a = NA_REAL; left->sq_b = NA_REAL; left->sq_y = NA_REAL;}
 
   /* Insert pointer to next interval to the right */
@@ -669,15 +672,20 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
       setsqueeze(tl);
     }
   }
-   else if (type == type_IVa) {
-     if (left->Tfx > right->Tfx) {
-       sethat(tl);
-     }
-     else {
-       sethat(tr);
-     }
-     setsqueeze(sc);
-   }
+  else if (type == type_IVa) {
+    if (left->Tfx > right->Tfx) {
+      sethat(tl);
+    }
+    else {
+      sethat(tr);
+    }
+    setsqueeze(sc);
+  }
+  else {
+    /* unknown type: set everything to NA */
+    sethatNA();
+    setsqueezeNA();
+  }
     
   /* Compute area below hat. */
   left->A_ht = area(left->c, left->ht_a, left->ht_b, left->ht_y, left->x, right->x);
@@ -692,6 +700,7 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
 #undef setarray
 #undef sethat
 #undef setsqueeze
+#undef sethatNA
 #undef setsqueezeNA
 
 } /* end of hat_iv() */
@@ -925,7 +934,7 @@ Tinflex_lib_setup (TINFLEX_FUNCT *lpdf, TINFLEX_FUNCT *dlpdf, TINFLEX_FUNCT *d2l
     error("Tinflex_setup(): Cannot create squeeze. A_squeeze is not finite: A_squeeze=%g", A_sq_tot);
   }
   
-  if (! R_FINITE(A_sq_tot >= 0.)) {
+  if (! (A_sq_tot >= 0.)) {
     Tinflex_lib_free(gen);
     error("Tinflex_setup(): Cannot create squeeze. A_squeeze is not >= 0: A_squeeze=%g", A_sq_tot);
   }
@@ -1068,13 +1077,57 @@ Tinflex_lib_sample (TINFLEX_GEN *gen, int n)
 /*   n    ... sample size                                                    */
 /*---------------------------------------------------------------------------*/
 {
+  SEXP sexp_res = R_NilValue; /* R object for storing random sample          */
+  int i;                      /* auxiliary loop variable                     */
+
+  /* check arguments */
+  if (n<=0) {
+    error("Tinflex_sample(): sample size 'n' must be positive integer"); 
+  }
+
+  /* Allocate memory for storing random sample. */
+  PROTECT(sexp_res = NEW_NUMERIC(n));
+
+  /* Get state for the R built-in URNG. */
+  GetRNGstate();
+
+  /* Draw sample of size 'n'. */
+  for (i=0; i<n; i++) {
+    
+    /* Generate and store random point. */
+    NUMERIC_POINTER(sexp_res)[i] = Tinflex_lib_sample_double(gen);
+  }
+
+  /* Update state for the R built-in URNG. */
+  PutRNGstate();
+
+  /* Return random sample to R. */
+  UNPROTECT(1);
+  return sexp_res;
+  
+} /* end of Tinflex_lib_sample() */
+
+/*---------------------------------------------------------------------------*/
+
+double
+Tinflex_lib_sample_double (TINFLEX_GEN *gen)
+/*---------------------------------------------------------------------------*/
+/* Draw one random number from Tinflex generator object.                     */
+/*---------------------------------------------------------------------------*/
+/*   gen  ... Tinflex generator object                                       */
+/*---------------------------------------------------------------------------*/
+/* (Repeated) calls to this function must be enclosed by a pair of           */
+/*    GetRNGstate();                                                         */
+/*    ...                                                                    */
+/*    PutRNGstate();                                                         */
+/* calls.                                                                    */
+/*---------------------------------------------------------------------------*/
+{
   TINFLEX_IV *ivs;            /* data for hat and squeeze for all intervals  */
   int n_ivs;                  /* number of intervals                         */
   double *Acum;               /* array for storing cumulative areas          */
   double A_ht_tot;            /* total area below hat                        */
   int *gt;                    /* guide table                                 */
-  SEXP sexp_res = R_NilValue; /* R object for storing random sample          */
-  int i;                      /* auxiliary loop variable                     */
 
   /* Acceptance-rejection loop: */
   double U,V;                 /* uniform random numbers                      */
@@ -1086,11 +1139,6 @@ Tinflex_lib_sample (TINFLEX_GEN *gen, int n)
   double X;                   /* random point                                */
   double hx, sx;              /* hat and squeeze at X                        */
 
-  /* check arguments */
-  if (n<=0) {
-    error("Tinflex_sample(): sample size 'n' must be positive integer"); 
-  }
-
   /* extract data */
   ivs = gen->ivs;           /* parameters for hat and squeeze */
   n_ivs = gen->n_ivs;       /* number of intervals */
@@ -1098,137 +1146,122 @@ Tinflex_lib_sample (TINFLEX_GEN *gen, int n)
   A_ht_tot = gen->A_ht_tot; /* total area below hat                        */
   gt = gen->gt;             /* guide table                                 */
   
-  /* Allocate memory for storing random sample. */
-  PROTECT(sexp_res = NEW_NUMERIC(n));
-
-  /* Get state for the R built-in URNG. */
-  GetRNGstate();
-
-  /* Draw sample of size 'n'. */
-  for (i=0; i<n; i++) {
+  /* Draw a random number */
+  while (1) {
+    /* Acceptance-rejection loop. */
     
-    while (1) {
-      /* Acceptance-rejection loop. */
-      
-      /* Draw interval. */
-      
-      /* Sequential search:
-       *   double sum = 0.;
-       *   U = A_ht_tot * unif_rand();
-       *   sum = 0.;
-       *   for (J=0; J<n_ivs; J++) {
-       * 	sum += (ivs + J)->A_ht;
-       * 	if (sum >= U) break;
-       * }
-       */
-      
-      /* Use guide table: */
-      U = unif_rand();
-      J = gt[(int)(U*n_ivs)];
-      U *= A_ht_tot;
-      for (; J<n_ivs; J++) {
-	if (Acum[J] >= U) break;
-      }
-      
-      /* Get parameters for hat in interval. */
-      iv = ivs + J;
-      
-      a  = iv->ht_a;
-      b  = iv->ht_b;
-      y  = iv->ht_y;
-      x0 = iv->x;
-      c  = iv->c;
-
-      /* Value of transformed hat (tangent) at left boundary of interval. */
-      t = a+b*(x0-y);
-      
-      /* Need a uniform random number in interval (0, iv->A_ht). */
-      /*    U = iv->A_ht * unif_rand();                          */
-      /* However, we can recycle U for this task.                */
-      U = iv->A_ht + U - Acum[J];
-      
-      /* Generate from "hat distribution":                  */
-      /*    X = y + ( FTinv(cT, FT(cT,t) + b*U) - a ) / b;  */
-      
-      /* For numerical reasons we have to distinguish */
-      /* between different values of 'cT'.            */
-      if (c == 0.) {
-      	/* Case: T(x)=log(x) */
-      
-      	double expt = exp(t);
-      	z = U * b / expt;
-      	if (fabs(z) > 1.e-6) {
-      	  X = y + ( log(expt + b*U) - a ) / b;
-      	  /* or for |z| < Inf:                                */
-      	  /*   X <- x0 + U / exp(a+b*(x0-y)) * 1/z * log(1+z) */
-      	} else {
-      	  /* We need approximation by Taylor polynomial to avoid */
-      	  /* severe round-off errors. */
-      	  X = x0 + U / expt * (1 - z/2 + z*z/3);
-      	}
-      }
-      
-      else if (c == -0.5) {
-      	/* Case: T(x) = -1/sqrt(x) */
-	
-      	z = U * b * t;
-      	if (fabs(z) > 1.e-6)
-      	  X = y + ( 1./(1./t - b*U) - a ) / b;
-      	else
-      	  X = x0 + U * t*t * (1 + z + z*z);
-      }
-      
-      else if (c == 1.) {
-      	/* Case: T(x) = x */
-      	z = U * b / (t*t);
-      	if (fabs(z) > 1.e-6)
-      	  X = y + (FTinv(c, FT(c, t)+b*U)-a)/b;
-	/* FIXME: why FT() and FTinv() ? */
-	/* X = y + (sqrt(t*t+b*U)-a)/b; */
-      	else
-      	  X = x0 + U / t * (1 - z/2 + z*z/2);
-      }
-      
-      else {
-      	/* Case: T(x)=sign(c)*x^c */
-      	/* For all other cases we only use a rough approximation in */
-      	/* case of numerical errors. */
-      
-      	if (fabs(b)>1e-10) {
-      	  X = y + ( FTinv(c, FT(c,t) + b*U) - a ) / b;
-	}
-	else { 
-       	  U = U / iv->A_ht;
-      	  X = (1.-U) * x0 + U * (iv+1)->x;
-       	}
-      }
-      
-      /* Compute hat and squeeze at X. */
-      hx = Tinv(c, a + b * (X-y));
-      if (iv->A_sq > 0)
-      	sx = Tinv(c, iv->sq_a + iv->sq_b * (X-iv->sq_y));
-      else
-      	sx = 0.;
-      
-      /* Accept or reject. */
-      V = hx * unif_rand();
-      
-      if ((V <= sx) ||
-	  (V <= exp(gen->lpdf(X, gen->params))) )
-	break;
+    /* Draw interval. */
+    
+    /* Sequential search:
+     *   double sum = 0.;
+     *   U = A_ht_tot * unif_rand();
+     *   sum = 0.;
+     *   for (J=0; J<n_ivs; J++) {
+     * 	sum += (ivs + J)->A_ht;
+     * 	if (sum >= U) break;
+     * }
+     */
+    
+    /* Use guide table: */
+    U = unif_rand();
+    J = gt[(int)(U*n_ivs)];
+    U *= A_ht_tot;
+    for (; J<n_ivs; J++) {
+      if (Acum[J] >= U) break;
     }
     
-    /* Store random point. */
-    NUMERIC_POINTER(sexp_res)[i] = X;
+    /* Get parameters for hat in interval. */
+    iv = ivs + J;
+    
+    a  = iv->ht_a;
+    b  = iv->ht_b;
+    y  = iv->ht_y;
+    x0 = iv->x;
+    c  = iv->c;
+    
+    /* Value of transformed hat (tangent) at left boundary of interval. */
+    t = a+b*(x0-y);
+    
+    /* Need a uniform random number in interval (0, iv->A_ht). */
+    /*    U = iv->A_ht * unif_rand();                          */
+    /* However, we can recycle U for this task.                */
+    U = iv->A_ht + U - Acum[J];
+    
+    /* Generate from "hat distribution":                  */
+    /*    X = y + ( FTinv(cT, FT(cT,t) + b*U) - a ) / b;  */
+    
+    /* For numerical reasons we have to distinguish */
+    /* between different values of 'cT'.            */
+    if (c == 0.) {
+      /* Case: T(x)=log(x) */
+      
+      double expt = exp(t);
+      z = U * b / expt;
+      if (fabs(z) > 1.e-6) {
+	X = y + ( log(expt + b*U) - a ) / b;
+	/* or for |z| < Inf:                                */
+	/*   X <- x0 + U / exp(a+b*(x0-y)) * 1/z * log(1+z) */
+      } else {
+	/* We need approximation by Taylor polynomial to avoid */
+	/* severe round-off errors. */
+	X = x0 + U / expt * (1 - z/2 + z*z/3);
+      }
+    }
+    
+    else if (c == -0.5) {
+      /* Case: T(x) = -1/sqrt(x) */
+      
+      z = U * b * t;
+      if (fabs(z) > 1.e-6)
+	X = y + ( 1./(1./t - b*U) - a ) / b;
+      else
+	X = x0 + U * t*t * (1 + z + z*z);
+    }
+    
+    else if (c == 1.) {
+      /* Case: T(x) = x */
+      z = U * b / (t*t);
+      if (fabs(z) > 1.e-6)
+	X = y + (FTinv(c, FT(c, t)+b*U)-a)/b;
+      /* FIXME: why FT() and FTinv() ? */
+      /* X = y + (sqrt(t*t+b*U)-a)/b; */
+      else
+	X = x0 + U / t * (1 - z/2 + z*z/2);
+    }
+    
+    else {
+      /* Case: T(x)=sign(c)*x^c */
+      /* For all other cases we only use a rough approximation in */
+      /* case of numerical errors. */
+      
+      if (fabs(b)>1e-10) {
+	X = y + ( FTinv(c, FT(c,t) + b*U) - a ) / b;
+      }
+      else { 
+	U = U / iv->A_ht;
+	X = (1.-U) * x0 + U * (iv+1)->x;
+      }
+    }
+    
+    /* Compute hat and squeeze at X. */
+    hx = Tinv(c, a + b * (X-y));
+    if (iv->A_sq > 0)
+      sx = Tinv(c, iv->sq_a + iv->sq_b * (X-iv->sq_y));
+    else
+      sx = 0.;
+    
+    /* Accept or reject. */
+    V = hx * unif_rand();
+    
+    if ((V <= sx) ||
+	(V <= exp(gen->lpdf(X, gen->params))) )
+      break;
   }
-
-  /* Update state for the R built-in URNG. */
-  PutRNGstate();
-
-  /* Return random sample to R. */
-  UNPROTECT(1);
-  return sexp_res;
-} /* end of Tinflex_lib_sample() */
+    
+  /* Return random number */
+  return X;
+  
+} /* end of Tinflex_lib_sample_double() */
 
 /*---------------------------------------------------------------------------*/
 

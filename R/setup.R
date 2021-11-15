@@ -159,8 +159,10 @@ Tinflex.setup <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=
   ## Compute parameters for hat and squeeze for initial intervals.
   for (i in 1:n.ivs) {
     params[,i] <- hat.iv(left=params[,i], right=params[,i+1], link=i+1)
+    ## DEBUG:
     ## print(params[,i])
   }
+  ## DEBUG:
   ## print(params[,n.ivs+1])
 
   ## Compute total areas for initial hat and squeeze.

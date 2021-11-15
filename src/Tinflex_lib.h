@@ -67,5 +67,8 @@ void * Tinflex_lib_free (TINFLEX_GEN *gen);
 SEXP Tinflex_lib_sample (TINFLEX_GEN *gen, int n);
 /* Draw sample from Tinflex generator object.                                */
 
+double Tinflex_lib_sample_double (TINFLEX_GEN *gen);
+/* Draw one random number from Tinflex generator object.                     */
+
 /*---------------------------------------------------------------------------*/
 
