@@ -20,8 +20,8 @@
   \tabular{ll}{
     Package: \tab Tinflex       \cr
     Type:    \tab Package       \cr
-    Version: \tab 1.8           \cr
-    Date:    \tab 2021-11-15    \cr
+    Version: \tab 2.1           \cr
+    Date:    \tab 2022-03-14    \cr
     License: \tab GPL 2 or later\cr
   }
 
@@ -52,7 +52,8 @@
   (for further details see \code{\link{Tinflex.setup}}):
   \itemize{
     \item the log-density of the targent distribution;
-    \item its first and second derivative;
+    \item its first derivative;
+    \item its second derivative (optionally);
     \item a starting partition of its domain such that each subinterval
     contains at most one inflection point of the transformed density;
     \item a transformation for the density
@@ -73,6 +74,14 @@
   }
 
   For further details see \code{\link{Tinflex.setup}}.
+
+  There are variants of the method.
+  The first one uses the second derivative to determine regions whre the
+  transformed density is convex, concave, or has a single inflection
+  points.
+  The second variant estimates the signs on the second derivative by
+  means of the first derivative. Thus it is easier to use at the expense
+  of a more complex algorithm. 
 
   There are two different implementation:
   Routine \code{\link{Tinflex.setup}} is implemented mainly in \R and
@@ -116,6 +125,10 @@
   Research Report Series / Department of Statistics and Mathematics
   Nr. 110, Department of Statistics and Mathematics, WU Wien,
   \url{https://epub.wu.ac.at/id/eprint/3158}).
+  
+  W. \enc{Hörmann}{Hoermann}, and J. Leydold (2022),
+  A Generalized Transformed Density Rejection Algorithm,
+  in preparation.
 }
 
 \seealso{
@@ -147,7 +160,7 @@ d2lpdf <- function(x) { (-alpha*(alpha-1)*abs(x)^(alpha-2)
 ib <- c(-Inf, 0, Inf)
 
 ## Create generator object.
-gen <- Tinflex.setup(lpdf, dlpdf, d2lpdf, ib=c(-Inf,0,Inf), rho=1.1)
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib=c(-Inf,0,Inf), rho=1.1)
 
 ## Print data about generator object.
 print(gen)
@@ -159,6 +172,12 @@ Tinflex.sample(gen, n=10)
 plot(gen, from=-2.5, to=2.5)
 ## ... and in transformed (log) scale.
 plot(gen, from=-2.5, to=2.5, is.trans=TRUE)
+
+## With Version 2.0 the setup also works without providing the
+## second derivative of the log-density
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib=c(-Inf,0,Inf), rho=1.1)
+Tinflex.sample(gen, n=10)
+
 }
 
 \keyword{package}

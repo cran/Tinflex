@@ -36,7 +36,6 @@ typedef struct Tinflex_iv TINFLEX_IV;
 
 /* Tinflex object                                                            */
 struct Tinflex_gen {
-  double *c;              /* parameter for transformation */
   TINFLEX_FUNCT *lpdf;    /* log-density */
   TINFLEX_FUNCT *dlpdf;   /* derivative of log-density */
   TINFLEX_FUNCT *d2lpdf;  /* second derivative of log-density */

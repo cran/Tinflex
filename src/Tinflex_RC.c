@@ -133,8 +133,8 @@ Tinflex_RC_sample (SEXP sexp_gen, SEXP sexp_n)
 
   /* Extract and check sample size. */
   n = *(INTEGER (AS_INTEGER (sexp_n)));
-  if (n<=0) {
-    error("sample size 'n' must be positive integer");
+  if (n<0) {
+    error("sample size 'n' must be non-negative integer");
   }
 
   /* Get parameters generator:        */

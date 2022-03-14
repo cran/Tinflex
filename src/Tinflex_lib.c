@@ -21,9 +21,6 @@
 /* Prototypes of private functions                                           */
 /*---------------------------------------------------------------------------*/
 
-static int cmpiv (const void *p1, const void *p2);
-/* auxiliary function for sorting intervals w.r.t. is 'x' value */
-
 /* static double Tf (double x, TINFLEX_GEN *gen, TINFLEX_IV *iv); */
 /* Compute transformed density by means of its log-density.                  */
 
@@ -34,8 +31,17 @@ static int Tfdd (double x, TINFLEX_GEN *gen, TINFLEX_IV *iv);
 static double arcmean( double x0, double x1 );
 /* compute "arctan mean" of two numbers.                                     */
 
-static int type_iv (TINFLEX_IV *left, TINFLEX_IV *right);
+static int type_with2ndD (TINFLEX_IV *left, TINFLEX_IV *right);
 /* Determine type of interval.                                               */
+
+static int type_no2ndD_init (TINFLEX_GEN *gen, TINFLEX_IV *left, TINFLEX_IV *right);
+/* Determine type of interval from scratch.                                  */
+
+static int type_no2ndD_split (TINFLEX_GEN *gen, TINFLEX_IV *left, TINFLEX_IV *right);
+/* Determine type of spitted subintervals.                                   */
+
+static int type_rules (double dTfl, double dTfr, double d2Tfl, double d2Tfr, double R);
+/* Rules for interval types.                                                 */
 
 static double area (double c, double a, double b, double y, double from, double to);
 /* Compute area underneath hat or squeeze in particular interval.            */
@@ -43,11 +49,27 @@ static double area (double c, double a, double b, double y, double from, double 
 static double do_area (double c, double a, double b, double y, double from, double to);
 /* Perform computation of area underneath hat or squeeze.                    */
 
-static int hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link);
+static int hat_iv (TINFLEX_IV *left, TINFLEX_IV *right);
 /* Compute hat and squeeze for a paricular interval.                         */
 
 static int make_guide_table (TINFLEX_GEN *gen);
 /* Create guide table for drawing interval at random.                        */
+
+static int cmpiv (const void *p1, const void *p2);
+/* auxiliary function for sorting intervals w.r.t. is 'x' value */
+
+static void update_area( TINFLEX_GEN *gen );
+/* Compute total area below hat and squeeze.                                 */
+
+static TINFLEX_GEN *
+Tinflex_lib_setup_with2ndD (TINFLEX_GEN *gen,
+			    double rho, int max_intervals);
+/* Setup: compute hat and squeeze for density.                               */
+
+static TINFLEX_GEN *
+Tinflex_lib_setup_no2ndD (TINFLEX_GEN *gen,
+			  double rho, int max_intervals);
+/* Setup: compute hat and squeeze for density.                               */
 
 #ifdef DEBUG
 static void debug_iv (TINFLEX_IV *iv);
@@ -89,9 +111,10 @@ Tfdd (double x, TINFLEX_GEN *gen, TINFLEX_IV *iv)
 /* Compute transformed density and its derivatives                           */
 /* by means of its log-density.                                              */
 /*---------------------------------------------------------------------------*/
-/*   x    ... argument                                                      */
-/*   gen  ... Tinflex generator object                                      */
+/*   x    ... argument                                                       */
+/*   gen  ... Tinflex generator object                                       */
 /*   iv   ... interval where the result is stored                            */
+/*            important: iv->c  must be set                                  */
 /*---------------------------------------------------------------------------*/
 {
   double lfx, dlfx, d2lfx;
@@ -102,7 +125,7 @@ Tfdd (double x, TINFLEX_GEN *gen, TINFLEX_IV *iv)
   /* evaluate log density and its derivatives. */
   lfx = gen->lpdf(x, gen->params);
   dlfx = gen->dlpdf(x, gen->params);
-  d2lfx = gen->d2lpdf(x, gen->params);
+  d2lfx = (gen->d2lpdf != NULL) ? gen->d2lpdf(x, gen->params) : NA_REAL;
 
   if (c == 0.) {
     /* Case: T(x) = log(x) */
@@ -117,7 +140,8 @@ Tfdd (double x, TINFLEX_GEN *gen, TINFLEX_IV *iv)
     Tfx =  s * exp(c * lfx);
     iv->Tfx = Tfx;
     iv->dTfx = c * Tfx * dlfx;
-    iv->d2Tfx = c * Tfx * (c * dlfx*dlfx + d2lfx);
+    iv->d2Tfx = (gen->d2lpdf != NULL) ? 
+      c * Tfx * (c * dlfx*dlfx + d2lfx) : NA_REAL;
   }
 
   /* success */
@@ -301,13 +325,23 @@ enum {
       type_IIIa = -3,
       type_IIIb =  3,
       type_IVa  = -4,  /* concave */
-      type_IVb  =  4   /* convex  */
+      type_IVb  =  4,  /* convex  */
+
+      /* combined types (see new paper): */
+      type_IIa_IVa  = -24,
+      type_IIb_IVa  =  24,
+      type_IIIa_IVb = -34,
+      type_IIIb_IVb =  34,
+
+      /* split types (see new paper): */
+      type_IIb_IVa__IIa_IVa   = 222,   /* For case (3.3.3) */
+      type_IIIa_IVb__IIIb_IVb = 333    /* For case (4.3.3) */
 };
 
 /*---------------------------------------------------------------------------*/
 
 int
-type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
+type_with2ndD (TINFLEX_IV *left, TINFLEX_IV *right)
 /*---------------------------------------------------------------------------*/
 /* Determine type of interval.                                               */
 /*---------------------------------------------------------------------------*/
@@ -320,7 +354,8 @@ type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
 {
   double c = left->c;   /* parameter 'c' for interval. */
   double R;             /* slope of secant */
-
+  int type;
+  
   /* Case: Unbounded domain. */
   if ( ! R_FINITE(left->x)) {
     if (right->d2Tfx < 0. && right->dTfx >= 0.)
@@ -338,6 +373,13 @@ type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
   
   /* Case: Interval where the density vanishes at boundary */
   /*       (and thus the log-density is -Inf). */
+
+  /* Subcase c > 0: */
+  /* We have no information about the derivative at the boundary point,      */
+  /* as we use the log-density as argument and not the density itself.       */
+  /* Assumption: Tf does not have an inflection point in this interval and   */
+  /* is thus either concave or convex in this interval.                      */
+  
   if ( (c > 0.  && left->Tfx == 0.)    ||
        (c <= 0. && left->Tfx <= R_NegInf) ) {
     if (right->d2Tfx < 0. && right->dTfx >= 0.)
@@ -357,54 +399,530 @@ type_iv (TINFLEX_IV *left, TINFLEX_IV *right)
     else
       return (0);
   }
-  
+
   /* Case: Domains where the density has a pole at boundary */
   /*       (and thus the transformed density equals 0 for c<0). */
+  /* Assumption: the transformed density is convex. */
   if (c < 0.) {
     if ((left->Tfx == 0.  && right->d2Tfx > 0.) ||
 	(right->Tfx == 0. && left->d2Tfx > 0.)  )
       return (type_IVb);
   }
+
+  /* General case */
   
   /* Compute slope of secant. */
   R = (right->Tfx - left->Tfx) / (right->x - left->x);
-  
+
+  type = type_rules(left->dTfx, right->dTfx,
+		    left->d2Tfx, right->d2Tfx, R);
+
+  if (! (type > -10 && type < 10)) {
+    /* we get a combined type. This should not happen. */
+    /* So we simply return "not determined". */
+    return(0);
+  }
+
+  return (type);
+
+} /* end of type_with2ndD() */
+
+/*---------------------------------------------------------------------------*/
+
+int
+type_no2ndD_init (TINFLEX_GEN *gen, TINFLEX_IV *left, TINFLEX_IV *right)
+/*---------------------------------------------------------------------------*/
+/* Determine type of interval from scratch.                                  */
+/*---------------------------------------------------------------------------*/
+/*   gen    ... Tinflex generator object                                     */
+/*   left   ... data for boundary point to the left                          */
+/*   right  ... data for boundary point to the right                         */
+/*---------------------------------------------------------------------------*/
+/* Return: type of interval;                                                 */
+/*         0 if type cannot be determined.                                   */
+/*---------------------------------------------------------------------------*/
+{
+  double c = left->c;   /* parameter 'c' for interval. */
+  double R;             /* slope of secant */
+  double p;             /* control point */
+  double Tfp, dTfp;     /* transformed density and derivate at p */
+  double tlp, trp;      /* value of tangent in p */
+  TINFLEX_IV ivp;       /* auxilary interval for storing control point */
+
+  /* Case: interval of length 0. */
+  if (left->x == right->x) {
+    return (0);
+  }
+
+  /* Control point */
+  p = arcmean(left->x, right->x);
+  ivp.c = left->c;
+  Tfdd (p, gen, &ivp);
+  Tfp = ivp.Tfx;
+  dTfp = ivp.dTfx;
+    
+  /* Case: Unbounded domain. */
+  /* Make a check for condition. */
+  if ( ! R_FINITE(left->x)) {
+    if (dTfp >= right->dTfx && right->dTfx > 0.) {
+      return (type_IVa);
+    }
+    else {
+      return (type_IIa_IVa);
+    }
+  }
+    
+  if ( ! R_FINITE(right->x)) {
+    if (left->dTfx >= dTfp && left->dTfx < 0.) {
+      return (type_IVa);
+    }
+    else {
+      return (type_IIb_IVa);
+    }
+  }
+
+  /* Evaluate tangents at boundary points at p */
+  tlp = left->Tfx + left->dTfx * (p - left->x);
+  trp = right->Tfx + right->dTfx * (p - right->x);
+
+  /* Compute slope of secant. */
+  R = (right->Tfx - left->Tfx) / (right->x - left->x);
+
+  /* Case: Interval where the density vanishes at boundary */
+  /*       (and thus the log-density is -Inf). */
+
+  /* Subcase c <= 0 */
+  if (c <= 0. && left->Tfx == R_NegInf) {
+    return (type_IIa_IVa);
+  }
+  if (c <= 0. && right->Tfx == R_NegInf) {
+    return (type_IIb_IVa);
+  }
+
+  /* Subcase c > 0: */
+  /* We have no information about the derivative at the boundary point,      */
+  /* as we use the log-density as argument and not the density itself.       */
+  /* Assumption: Tf does not have an inflection point in this interval and   */
+  /* is thus either concave or convex in this interval.                      */
+
+  if (c > 0. && left->Tfx == 0. && right->Tfx > 0.) {
+    if (right->dTfx <= R) {
+      /* concave */
+      return (type_IVa);
+    }
+    else if (right->dTfx >= R) {
+      /* convex */
+      return (type_IVb);
+    }
+    else {
+      return (0);
+    }
+  }
+
+  if (c > 0. && left->Tfx > 0. && right->Tfx == 0.) {
+    if (left->dTfx >= R) {
+      /* concave */
+      return (type_IVa);
+    }
+    else if (left->dTfx <= R) {
+      /* convex */
+      return (type_IVb);
+    }
+    else {
+      return (0);
+    }
+  }
+
+  /* Case: Domains where the density has a pole at boundary */
+  /*       (and thus the transformed density equals 0 for c<0). */
+  /* Assumption: the transformed density is convex. */
+  /* (We make a simple check) */
+  if (c < 0.) {
+    if ( (left->Tfx == 0. && R <= right->dTfx && right->dTfx < 0.) ||
+	 (right->Tfx == 0. && R >= left->dTfx && left->dTfx > 0.) ) {
+      return (type_IVb);
+    }
+  }
+    
   /* Check for all other possible cases. */
-  if (left->dTfx >= R && right->dTfx >= R)
+  if (left->dTfx >= R && right->dTfx >= R) {
+    /* case (1) */
     return (type_Ia);
-  
-  if (left->dTfx <= R && right->dTfx <= R)
-    return (type_Ib);
-  
-  if (left->d2Tfx < 0. && right->d2Tfx < 0.)
-    return (type_IVa);
-  
-  if (left->d2Tfx > 0. && right->d2Tfx > 0.)
-    return (type_IVb);
-  
-  if (left->d2Tfx < 0. || right->d2Tfx > 0.) {
-    if (left->dTfx >= R && R >= right->dTfx)
-      return (type_IIa);
-  
-    if (left->dTfx <= R && R <= right->dTfx)
-      return (type_IIIa);
   }
   
-  if (left->d2Tfx > 0. || right->d2Tfx < 0.) {
-    if (left->dTfx >= R && R >= right->dTfx)
+  if (left->dTfx <= R && right->dTfx <= R) {
+    /* case (2) */
+    return (type_Ib);
+  }
+
+  if (left->dTfx >= R && right->dTfx <= R) {
+    /* case (3) */
+    if (dTfp <= right->dTfx) {
+      /* case (3.1) */
+      return (type_IIa);
+    }
+    if (dTfp >= left->dTfx) {
+      /* case (3.2) */
       return (type_IIb);
-  
-    if (left->dTfx <= R && R <= right->dTfx)
+    }
+    /* else: left->dTfx >= dTfp >= right->dTfx */
+    /*   case (3.3) */
+    if (Tfp > tlp) {
+      /* case (3.3.1) */
+      return (type_IIb);
+    }
+    if (Tfp > trp) {
+      /* case (3.3.2) */
+      return (type_IIa);
+    }
+    else {
+      /* case (3.3.3) */
+      if (! (Tfp <= tlp && Tfp <= trp)) {
+	/* check for possible numerical errors */
+	return (0);
+      }
+      return (type_IIb_IVa__IIa_IVa);
+    }
+  }
+
+  if (left->dTfx <= R && right->dTfx >= R) {
+    /* case (4) */
+    if (dTfp <= left->dTfx) {
+      /* case (4.1) */
+      return (type_IIIa);
+    }
+    if (dTfp >= right->dTfx) {
+      /* case (4.2) */
       return (type_IIIb);
+    }
+    /* else: left->dTfx <= dTfp <= right->dTfx */
+    /*   case (4.3) */
+    if (Tfp < tlp) {
+      /* case (4.3.1) */
+      return (type_IIIa);
+    }
+    if (Tfp < trp) {
+      /* case (4.3.2) */
+      return (type_IIIb);
+    }
+    else {
+      /* case (4.3.3) */
+      if (! (Tfp >= tlp && Tfp >= trp)) {
+	/* check for possible numerical errors */
+	return (0);
+      }
+      return (type_IIIa_IVb__IIIb_IVb);
+    }
   }
   
   /* Cannot estimate type of interval. */
   /* Do we need a warning? Probably not. */
   /* --> warning("cannot detect type of interval") */
-  
+    
   return (0);
 
-} /* end of type_iv() */
+} /* end of type_no2ndD_init() */
+
+/*---------------------------------------------------------------------------*/
+
+int
+type_no2ndD_split(TINFLEX_GEN *gen, TINFLEX_IV *left, TINFLEX_IV *right)
+/*---------------------------------------------------------------------------*/
+/* Split interval and determine type of subintervals.                        */
+/* Interval 'left' is updated and stores the left of the two subintervals,   */
+/* while the right of the interval is stored in a new entry of gen->ivs.     */
+/*---------------------------------------------------------------------------*/
+/*   gen    ... Tinflex generator object                                     */
+/*   left   ... data for boundary point to the left                          */
+/*   right  ... data for boundary point to the right                         */
+/*---------------------------------------------------------------------------*/
+/* Return:                                                                   */
+/*---------------------------------------------------------------------------*/
+{
+  int type;                   /* type of current interval */
+  double p, pD;               /* splitting point for interval */
+  TINFLEX_IV *ivp;            /* pointer to new interval with splitting point p */
+  TINFLEX_IV ivpD;            /* auxiliary interval for splitting point pD */
+  double dTfp, dTfpD;         /* derivative of transformed density at p and pD, resp. */
+  double d2Tfl, d2Tfr, d2Tfp; /* signs of second derivatives */
+  double Rl, Rr;              /* secants in subintervals */
+  char psplit;                /* indicator for splitting point: 'c' or 'D' */
+  
+  /* Type of interval to be split. */
+  type = left->type;
+
+  /* Splitting point for interval (use "arc mean"). */
+  p = arcmean(left->x, right->x);
+
+  /* Create new interval on r.h.s. */
+  ++(gen->n_ivs);
+
+  ivp = gen->ivs + gen->n_ivs;
+  ivp->x = p;
+  ivp->c = left->c;
+  Tfdd (p, gen, ivp);
+  dTfp = ivp->dTfx;
+
+  /* Update links */
+  ivp->next = left->next;
+  left->next = gen->n_ivs;
+  
+  /* Case: Unknown type in current interval */
+  if (type == 0) {
+    /* try rule for initial interval */
+    type = type_no2ndD_init(gen, left, right);
+    if (type == type_IIb_IVa__IIa_IVa) {
+      /* Case (3.3.3) */
+      left->type = type_IIb_IVa;
+      ivp->type = type_IIa_IVa;
+      return 1;
+    }
+    else if (type == type_IIIa_IVb__IIIb_IVb ) {
+      /* Case (4.3.3) */
+      left->type = type_IIIa_IVb;
+      ivp->type = type_IIIb_IVb;
+      return 1;
+    }
+    /* else: continue with new type */
+  }
+
+
+  /* Concave | convex */
+  if (type == type_IVa) {
+    left->type = type_IVa;
+    ivp->type = type_IVa;
+    return 1;
+  }
+    
+  if (type == type_IVb) {
+    left->type = type_IVb;
+    ivp->type = type_IVb;
+    return 1;
+  }
+
+  /* Auxiliary splitting point */
+  if (R_FINITE(left->x) && R_FINITE(right->x)) {
+    pD = p + (right->x - left->x) * 1.e-3;
+  }
+  else if (R_FINITE(left->x)) {
+    pD = p + (p - left->x) * 1.e-3;
+  }
+  else {  /* R_FINITE(right->x) */
+    pD = p + (right->x - p) * 1.e-3;
+  }
+  ivpD.x = pD;
+  ivpD.c = left->c;
+  Tfdd (pD, gen, &ivpD);
+  dTfpD = ivpD.dTfx;
+  
+  if (! (R_FINITE(p) && R_FINITE(ivpD.Tfx) && R_FINITE(dTfpD))) { 
+    /* something is wrong here */
+    left->type = 0;
+    ivp->type = 0;
+    return 0;
+  }
+  
+  psplit = '\0';
+  d2Tfl = NA_REAL;
+  d2Tfp = NA_REAL;
+  d2Tfr = NA_REAL;
+
+  /* Get splitting points and sign of 2nd derivative */
+  if (type == type_Ia || type == type_IIa || type == type_IIIa) {
+    d2Tfl = -1;
+    d2Tfr =  1;
+    if (dTfp < dTfpD) {
+      psplit = 'D';
+      d2Tfp = +1;
+    }
+    else {
+      psplit = 'p';
+      d2Tfp = -1;
+    }
+  }
+  
+  else if (type == type_Ib || type == type_IIb || type == type_IIIb) {
+    d2Tfl =  1;
+    d2Tfr = -1;
+    if (dTfp < dTfpD) {
+      psplit = 'p';
+      d2Tfp = +1;
+    }
+    else {
+      psplit = 'D';
+      d2Tfp = -1;
+    }
+  }
+  
+  /* Combined types */
+    
+  else if (type == type_IIa_IVa) {
+    d2Tfl = -1;
+    d2Tfr = NA_REAL;
+    if (dTfp < dTfpD) {
+      psplit = 'D';
+      d2Tfp = +1;
+      d2Tfr = +1;
+    }
+    else {
+      psplit = 'p';
+      d2Tfp = -1;
+    }
+  }
+  
+  else if (type == type_IIb_IVa) {
+    d2Tfl = NA_REAL;
+    d2Tfr = -1;
+    if (dTfp < dTfpD) {
+      psplit = 'p';
+      d2Tfp = +1;
+      d2Tfl = +1;
+    }
+    else {
+      psplit = 'D';
+      d2Tfp = -1;
+    }
+  }
+  
+  else if (type == type_IIIa_IVb) {
+    d2Tfl = NA_REAL;
+    d2Tfr = +1;
+    if (dTfp < dTfpD) {
+      psplit = 'D';
+      d2Tfp = +1;
+    }
+    else {
+      psplit = 'p';
+      d2Tfl = -1;
+      d2Tfp = -1;
+    }
+  }
+
+  else if (type == type_IIIb_IVb) {
+    d2Tfl = +1;
+    d2Tfr = NA_REAL;
+    if (dTfp < dTfpD) {
+      psplit = 'p';
+      d2Tfp = +1;
+    }
+    else {
+      psplit = 'D';
+      d2Tfp = -1;
+      d2Tfr = -1;
+    }
+  }
+  
+  else {
+    /* this should not happen */
+    /*         return (c(p,Tfp,dTfp,0,0)) */
+  }
+
+  /* If you have to use splitting point 'pD' */
+  /* we copy it into 'ivp' first             */
+  if (psplit != 'p') {
+    ivp->x = ivpD.x;
+    ivp->Tfx = ivpD.Tfx;
+    ivp->dTfx = ivpD.dTfx;
+    ivp->d2Tfx = ivpD.d2Tfx;
+  }
+
+  /* Compute slopes of secants in the subintervals. */
+  Rl = (ivp->Tfx - left->Tfx) / (ivp->x - left->x);
+  Rr = (right->Tfx - ivp->Tfx) / (right->x - ivp->x);
+
+  /* Get types for each subinterval */
+  left->type = type_rules(left->dTfx, ivp->dTfx, d2Tfl, d2Tfp, Rl);
+  ivp->type  = type_rules(ivp->dTfx, right->dTfx, d2Tfp, d2Tfr, Rr);
+
+  return 1;
+  
+} /* end of type_no2ndD_split() */
+
+/*---------------------------------------------------------------------------*/
+
+int
+type_rules (double dTfl, double dTfr, double d2Tfl, double d2Tfr, double R)
+/*---------------------------------------------------------------------------*/
+/* Rules for interval types.                                                 */
+/*---------------------------------------------------------------------------*/
+/*   dTfl   ... derivative on left boundary */
+/*   dTfr   ... derivative on right boundary */
+/*   d2Tfl  ... 2nd derivative on left boundary */
+/*   d2Tfr  ... 2nd derivative on right boundary */
+/*   R      ... slope of secant */
+/*   left   ... data for boundary point to the left                          */
+/*   right  ... data for boundary point to the right                         */
+/*---------------------------------------------------------------------------*/
+/* Return: type of interval;                                                 */
+/*         0 if type cannot be determined.                                   */
+/*---------------------------------------------------------------------------*/
+{
+
+  /* REGULAR types */
+    
+  if (dTfl > R && dTfr > R) {
+    return (type_Ia);
+  } 
+
+  if (dTfl < R && dTfr < R) {
+    return (type_Ib);
+  }
+
+  if (d2Tfl < 0. && d2Tfr < 0.) {
+    return (type_IVa);
+  }
+    
+  if (d2Tfl > 0. && d2Tfr > 0.) {
+    return (type_IVb);
+  }
+
+  if (d2Tfl <= 0. && 0. <= d2Tfr) {
+    if (dTfl >= R && R >= dTfr) {
+      return (type_IIa);
+    }
+    if (dTfl <= R && R <= dTfr) {
+      return (type_IIIa);
+    }
+  }
+
+  if (d2Tfl >= 0. && 0. >= d2Tfr) {
+    if (dTfl >= R && R >= dTfr) {
+      return (type_IIb);
+    }
+    if (dTfl <= R && R <= dTfr) {
+      return (type_IIIb);
+    }
+  }
+
+  /* Combinded types */
+
+  if (dTfl >= R && R >= dTfr) {
+    if (d2Tfl <= 0.) {
+      return (type_IIa_IVa);
+    }
+    if (d2Tfr <= 0.) {
+      return (type_IIb_IVa);
+    }
+    /* else: should not happen */
+  }
+  
+  if (dTfl <= R && R <= dTfr) {
+    if (d2Tfr >= 0.) {
+      return (type_IIIa_IVb);
+    }
+    if (d2Tfl >= 0.) {
+      return(type_IIIb_IVb);
+    }
+    /* else: should not happen */
+  }
+
+  /* Cannot estimate type of interval. */
+  /* Do we need a warning? Probably not. */
+  /* --> warning("cannot detect type of interval") */
+
+  return (0);
+
+} /* end of type_rules() */
 
 /*---------------------------------------------------------------------------*/
 
@@ -466,7 +984,8 @@ do_area (double c, double a, double b, double y, double from, double to)
 /*---------------------------------------------------------------------------*/
 {
   double area;
-  double s, sc, z;
+  double s, z;
+  double tleft, tright;
   
   /* check for a new "empty" interval without data */
   if (ISNA(a)) {
@@ -500,26 +1019,16 @@ do_area (double c, double a, double b, double y, double from, double to)
   
   /* else: c!=0 */
 
-  /* sign of c */
-  sc = (c > 0.) ? 1. : -1.;
-    
   /* The tangent to the transformed density must not vanish. */
-  /* Otherwise, we cannot construct the hat function. */
-  if (! (sc * (a+b*(from-y)) >= 0.) ||
-      ! (sc * (a+b*(to-y))   >= 0.) ) {
-    /* Case: numerical errors */
-    if (!R_FINITE(a) && a < 0.) {
-      /* underflow in computing Tf(x) (resulting in -Inf) */
-      /* we assume that the area is 0 */
-      return (0.);
-    }
-    /* else: */
-    if (a < 1.e250 && ! R_FINITE(b)) {
-      /* close to underflow when computing Tf(x) and overflow of tangent */
-      /* we assume that the area is 0 */
-      return (0.);
-    }
-    /* else: we have to split the interval */
+  /* Otherwise, we cannot construct the hat function.        */
+  tleft  = a+b*(from-y);
+  tright = a+b*(to-y);
+
+  if (c<0. && !(tleft <= 0. && tright <= 0.) ) {
+    /* we have to split the interval */
+    return (R_PosInf);
+  }
+  else if (c>0. && !(tleft >= 0. && tright >= 0.) ) {
     return (R_PosInf);
   }
 
@@ -573,13 +1082,12 @@ do_area (double c, double a, double b, double y, double from, double to)
 /*---------------------------------------------------------------------------*/
 
 int
-hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
+hat_iv (TINFLEX_IV *left, TINFLEX_IV *right)
 /*---------------------------------------------------------------------------*/
-/* Compute hat and squeeze for a paricular interval.                         */
+/* Compute hat and squeeze for a particular interval.                        */
 /*---------------------------------------------------------------------------*/
 /*   left   ... data for boundary point to the left and for entire interval  */
 /*   right  ... data for boundary point to the right                         */
-/*   link   ... "pointer" to next interval to the right                      */
 /*---------------------------------------------------------------------------*/
 /* Return: vector with parameter of same kind as 'left'.                     */
 /*---------------------------------------------------------------------------*/
@@ -599,7 +1107,7 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
 
   /* Insert pointer to next interval to the right */
   /* (next element in poor man's linked list). */
-  left->next = link;
+  /* left->next = link; */
 
   /* Check for interval of length 0. */
   if ( left->x == right->x ) {
@@ -613,8 +1121,15 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
   }
   
   /* Get type of distribution. */
-  left->type = type = type_iv(left, right);
+  type = left->type;
 
+  /* Unknown type */
+  if (type == 0) {
+    left->A_ht = R_PosInf;
+    left->A_sq = 0.;
+    return (0);
+  }
+  
   /* Compute tangent at boundary points. */
   setarray(tl, left->Tfx, left->dTfx, left->x);
   setarray(tr, right->Tfx, right->dTfx, right->x);
@@ -629,6 +1144,7 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
   }
   
   /* Case: unbounded domains. */
+
   if (! R_FINITE(left->x) && type == type_IVa) {
     sethat(tr);
     setsqueezeNA();
@@ -639,6 +1155,7 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
   }
 
   /* Case: bounded domains. */
+
   else if (type == type_Ia) {
     sethat(tl);
     setsqueeze(tr);
@@ -681,12 +1198,33 @@ hat_iv (TINFLEX_IV *left, TINFLEX_IV *right, int link)
     }
     setsqueeze(sc);
   }
+
+  /* Case: combined types */
+
+  else if (type == type_IIa_IVa) {
+    sethat(tl);
+    setsqueeze(sc);
+  }
+  else if (type == type_IIb_IVa) {
+    sethat(tr);
+    setsqueeze(sc);
+  }
+  else if (type == type_IIIa_IVb) {
+    sethat(sc);
+    setsqueeze(tr);
+  }
+  else if (type == type_IIIb_IVb) {
+    sethat(sc);
+    setsqueeze(tl);
+  }
+
+  /* unknown type: set everything to NA */
+
   else {
-    /* unknown type: set everything to NA */
     sethatNA();
     setsqueezeNA();
   }
-    
+
   /* Compute area below hat. */
   left->A_ht = area(left->c, left->ht_a, left->ht_b, left->ht_y, left->x, right->x);
 
@@ -731,23 +1269,15 @@ Tinflex_lib_setup (TINFLEX_FUNCT *lpdf, TINFLEX_FUNCT *dlpdf, TINFLEX_FUNCT *d2l
 /*---------------------------------------------------------------------------*/
 {
   int i;                       /* loop variable */
-  double *cvec;                /* temporary vector of values for paramater 'c' */
   TINFLEX_IV *ivs;             /* pointer to list of all intervals */
   TINFLEX_IV *iv;              /* pointer to current and next interval */
-  TINFLEX_IV *left, *right;    /* pointer to left (current) and right (next) interval */
   TINFLEX_GEN *gen;            /* generator object */
-  int n_ivs;                   /* number of intervals  */
-  int last_idx;                /* index of last interval used in linked list */ 
-  int last_idx_save;           /* ... before starting current update loop */
-  double A_ht_tot, A_sq_tot;   /* total area below hat / squeeze */
-  double threshold;            /* threshold for splitting interval */
-  double p;                    /* splitting point for interval */
 
   /* --- Check arguments */
 
   if (! (rho >= 1.0001)) {
-    warning("Tinflex_setup(): argument 'rho' too small or invalid, using default");
-    rho = 1.1;
+    warning("Tinflex_setup(): argument 'rho' too small or invalid, using 1.0001");
+    rho = 1.0001;
   }
 
   if (! (max_intervals > 11)) {
@@ -755,7 +1285,7 @@ Tinflex_lib_setup (TINFLEX_FUNCT *lpdf, TINFLEX_FUNCT *dlpdf, TINFLEX_FUNCT *d2l
     max_intervals = 1001;
   }
 
-  if (n_ib < 2 || n_ib > max_intervals / 2) {
+  if (n_ib < 2 || n_ib > max_intervals / 3) {
     error("Tinflex_setup(): argument 'ib' invalid");
   }
   
@@ -778,31 +1308,17 @@ Tinflex_lib_setup (TINFLEX_FUNCT *lpdf, TINFLEX_FUNCT *dlpdf, TINFLEX_FUNCT *d2l
   
   /* ........................................................................ */
 
-  /* Get parameter 'c' for transformation. */
-  cvec = R_Calloc(n_ib, double);
-  if (n_c ==1 ) {
-    for (i=0; i< n_ib; i++) {
-      cvec[i] = c[0];
-    }
-  }
-  else {
-    memcpy(cvec, c, n_c * sizeof(double));
-    /* duplicate last element. */
-    cvec[n_ib-1] = c[n_c-1];
-  }
-
   /* Create a table for hat and squeeze. */
-  ivs = R_Calloc(max_intervals+1, TINFLEX_IV);
+  ivs = R_Calloc(max_intervals+3, TINFLEX_IV);
 
   /* Create generator object */
   gen = R_Calloc(1, TINFLEX_GEN);
-  gen->c = cvec;
   gen->lpdf = lpdf;
   gen->dlpdf = dlpdf;
   gen->d2lpdf = d2lpdf;
   gen->params = params;
   gen->ivs = ivs;
-  gen->n_ivs = 0;
+  gen->n_ivs = 0L;
   gen->Acum = NULL;
   gen->gt = NULL;
 
@@ -816,155 +1332,84 @@ Tinflex_lib_setup (TINFLEX_FUNCT *lpdf, TINFLEX_FUNCT *dlpdf, TINFLEX_FUNCT *d2l
   /* in order to store the transformed density for the boundary */
   /* to the right.  */
 
-  last_idx = -1L;
+  /* Initial intervals */
+
   for (i=0; i<n_ib; i++) {
     
     /* store data for interval */
-    ++last_idx;
-    iv = ivs + last_idx;
+    iv = ivs + gen->n_ivs;
+    ++(gen->n_ivs);
     iv->x = ib[i];
-    iv->c = cvec[i];
+    iv->c = (n_c == 1) ? c[0] : ((i<n_c) ? c[i] : c[n_c-1]);
     Tfdd (ib[i], gen, iv);
-
+    /* Insert pointer to next interval to the right */
+    /* (next element in poor man's linked list).    */
+    iv->next = gen->n_ivs;
+    
     /* Parameter 'c' changes for next interval. */
     /* Thus we insert an interval of length 0. */
-    if (i+1 < n_ib && cvec[i] != cvec[i+1]) {
-      ++last_idx;
-      iv = ivs + last_idx;
+    if (i < n_c-1 && c[i] != c[i+1]) {
+      iv = ivs + gen->n_ivs;
+      ++(gen->n_ivs);
       iv->x = ib[i+1];
-      iv->c = cvec[i];
+      iv->c = c[i];
       Tfdd (ib[i+1], gen, iv);
+      iv->next = gen->n_ivs;
     }
   }
 
   /* Terminate poor man's linked list. */
-  (ivs+last_idx)->next = -1;
+  iv->next = -1L;    /* same as: (ivs+gen->n_ivs-1L)->next = -1L; */
 
-  /* remove temporary vector */
-  R_Free(cvec);
-
-  /* Compute parameters for hat and squeeze for initial intervals. */
-  for (i=0; i<last_idx; i++) {
-    hat_iv(/*left=*/ivs+i, /*right=*/ivs+i+1, /*link=*/i+1); 
-#ifdef DEBUG
-    debug_iv (ivs+i);
-#endif
+  /* NOTE: gen->n_ivs is the number of TINFLEX_IV objects where the last one,  */
+  /* ivs + (gen->n_ivs) - 1, just contains the right boundary of the domain.    */
+  /* So we decrement the counter for the number of intervals. */
+  --(gen->n_ivs);
+  
+  /* --- Compute hat and squeeze --- */
+  if (d2lpdf != NULL) {
+    Tinflex_lib_setup_with2ndD (gen, rho, max_intervals);
   }
-
-#ifdef DEBUG
-    debug_iv (ivs+last_idx);
-#endif
-
-  /* Compute total areas for initial hat and squeeze. */
-  A_ht_tot = 0.;
-  A_sq_tot = 0.;
-  for (i=0; i<last_idx; i++) {
-    A_ht_tot += (ivs+i)->A_ht;
-    A_sq_tot += (ivs+i)->A_sq;
+  else {
+    Tinflex_lib_setup_no2ndD (gen, rho, max_intervals);
   }
-
-  /* We have to split intervals where the area */
-  /* between hat and squueze is too large. */
-  while (! (A_ht_tot <= rho * A_sq_tot) && (last_idx < max_intervals)) {
-
-    /* Compute average area. */
-    threshold = 0.99 * (A_ht_tot - A_sq_tot) / last_idx;
-
-    /* Split all intervals where area between hat and squeeze is too large. */
-    last_idx_save = last_idx;
-    for (i=0; i<=last_idx_save; i++) {
-
-      /* scan through all intervals */
-      iv = ivs+i;
-
-      if ( iv->next < 0 || (iv->A_ht  - iv->A_sq) < threshold) {
-	continue;
-      }
-      if ( last_idx >= max_intervals) {
-	warning("Tinflex_setup(): maximum number of intervals reached");
-	break;
-      }
-      
-      /* split intervals where area between hat and squeeze is too large. */
-      left = iv;
-      right = ivs + iv->next;
-
-      /* Splitting point for interval (use "arc mean"). */
-      p = arcmean(iv->x, right->x);
-
-      /* Create new interval. */
-      ++last_idx;
-
-      iv = ivs + last_idx;
-      iv->x = p;
-      iv->c = left->c;
-      Tfdd (p, gen, iv);
-
-      /* New interval on r.h.s. */
-      hat_iv(/*left=*/iv, /*right=*/right, /*link=*/left->next); 
-      /* Update interval on l.h.s. */
-      hat_iv(/*left=*/left, /*right=*/iv, /*link=*/last_idx); 
-    }
-
-    /* Update total areas. */
-    A_ht_tot = 0.;
-    A_sq_tot = 0.;
-    for (i=0; i<=last_idx; i++) {
-      iv = ivs+i;
-      if (iv->next >= 0L) {
-	A_ht_tot += iv->A_ht;
-	A_sq_tot += iv->A_sq;
-      }
-    }
-  }
-
+  
   /* Check result. */
-  if (! R_FINITE(A_ht_tot)) { 
+  if (! R_FINITE(gen->A_ht_tot)) { 
     Tinflex_lib_free(gen);
-    error("Tinflex_setup(): Cannot create hat function. A_hat is not finite: A_hat=%g", A_ht_tot);
+    error("Tinflex_setup(): Cannot create hat function. A_hat is not finite: A_hat=%g", gen->A_ht_tot);
   }
     
-  if (! (A_ht_tot > 0.)) {
+  if (! (gen->A_ht_tot > 0.)) {
     Tinflex_lib_free(gen);
-    error("Tinflex_setup(): Cannot create hat function. A_hat is not > 0: A_hat=%g", A_ht_tot);
+    error("Tinflex_setup(): Cannot create hat function. A_hat is not > 0: A_hat=%g", gen->A_ht_tot);
   }
 
-  if (! R_FINITE(A_sq_tot)) {
+  if (! R_FINITE(gen->A_sq_tot)) {
     Tinflex_lib_free(gen);
-    error("Tinflex_setup(): Cannot create squeeze. A_squeeze is not finite: A_squeeze=%g", A_sq_tot);
+    error("Tinflex_setup(): Cannot create squeeze. A_squeeze is not finite: A_squeeze=%g", gen->A_sq_tot);
   }
   
-  if (! (A_sq_tot >= 0.)) {
+  if (! (gen->A_sq_tot >= 0.)) {
     Tinflex_lib_free(gen);
-    error("Tinflex_setup(): Cannot create squeeze. A_squeeze is not >= 0: A_squeeze=%g", A_sq_tot);
+    error("Tinflex_setup(): Cannot create squeeze. A_squeeze is not >= 0: A_squeeze=%g", gen->A_sq_tot);
   }
 
-  if (! (A_ht_tot >= A_sq_tot)) {
+  if (! (gen->A_ht_tot >= gen->A_sq_tot)) {
     Tinflex_lib_free(gen);
-    error("Tinflex_setup(): Invalid input: A_hat = %g < %g = A_squeeze!", A_ht_tot, A_sq_tot);
+    error("Tinflex_setup(): Invalid input: A_hat = %g < %g = A_squeeze!", gen->A_ht_tot, gen->A_sq_tot);
   }
 
-  if (! (A_ht_tot <= rho * A_sq_tot)) {
+  if (! (gen->A_ht_tot <= rho * gen->A_sq_tot)) {
     error("Tinflex_setup(): ratio A_hat / A_squeeze = %g is larger than rho = %g",
-	  A_ht_tot / A_sq_tot, rho);
+	  gen->A_ht_tot / gen->A_sq_tot, rho);
   }
 
-  /* store areas */
-  gen->A_ht_tot = A_ht_tot;
-  gen->A_sq_tot = A_sq_tot;
-  
-  /* Number of intervals */
-  n_ivs = last_idx;
-  
   /* Truncate working array. */
-  ivs = R_Realloc(ivs, n_ivs+1L, TINFLEX_IV);
+  gen->ivs = R_Realloc(gen->ivs, gen->n_ivs+1L, TINFLEX_IV);
 
   /* Sort list (so that the 'next' marker becomes obsolete). */
-  qsort(ivs, (n_ivs+1L), sizeof(TINFLEX_IV), cmpiv);
-  
-  /* Store intervals in generator object */
-  gen->ivs = ivs;
-  gen->n_ivs = n_ivs;
+  qsort(gen->ivs, (gen->n_ivs+1L), sizeof(TINFLEX_IV), cmpiv);
 
   /* Compute guide table. */
   make_guide_table(gen);
@@ -993,6 +1438,275 @@ int cmpiv (const void *p1, const void *p2)
   else
     return (0L);
 } /* end of cmpiv() */
+
+/*...........................................................................*/
+
+void update_area( TINFLEX_GEN *gen )
+/*---------------------------------------------------------------------------*/
+/* Compute total area below hat and squeeze.                                 */
+/*---------------------------------------------------------------------------*/
+/*   gen  ... Tinflex generator object                                       */
+/*---------------------------------------------------------------------------*/
+{
+  TINFLEX_IV *iv;         /* pointer to current interval */
+  int i;                  /* loop variable */
+
+  gen->A_ht_tot = 0.;
+  gen->A_sq_tot = 0.;
+
+  for (i=0; i<=gen->n_ivs; i++) {
+    iv = gen->ivs+i;
+    if (iv->next >= 0L) {
+      gen->A_ht_tot += iv->A_ht;
+      gen->A_sq_tot += iv->A_sq;
+    }
+  }
+
+} /* end of total_area() */
+
+/*...........................................................................*/
+
+TINFLEX_GEN *
+Tinflex_lib_setup_with2ndD (TINFLEX_GEN *gen,
+			    double rho, int max_intervals)
+/*---------------------------------------------------------------------------*/
+/* Setup: compute hat and squeeze for density.                               */
+/* Version that makes use of 2nd derivative.                                 */
+/*---------------------------------------------------------------------------*/
+/*   gen  ... Tinflex generator object                                       */
+/*   rho  ... performance parameter: requested upper bound for ratio         */
+/*            between area below hat and area below squeeze                  */
+/*   max_intervals ... maximal numbers of intervals                          */
+/*---------------------------------------------------------------------------*/
+/* Return: Tfinflex generator object.                                        */
+/*---------------------------------------------------------------------------*/
+{
+  int i;                       /* loop variable */
+  TINFLEX_IV *ivs;             /* pointer to list of all intervals */
+  TINFLEX_IV *iv;              /* pointer to current and next interval */
+  TINFLEX_IV *left, *right;    /* pointer to left (current) and right (next) interval */
+  int n_ivs_save;              /* number of intervals before starting loop */
+  double threshold;            /* threshold for splitting interval */
+  double p;                    /* splitting point for interval */
+
+  /* --- Check arguments */
+
+  /* done in Tinflex_lib_setup() */
+
+  /* ........................................................................ */
+
+  /* Pointer to table for hat and squeeze. */
+  ivs = gen->ivs;
+
+  /* Compute parameters for hat and squeeze for initial intervals. */
+  /* Remark: ivs+gen->n_ivs contains the right boundary */
+  for (i=0; i < gen->n_ivs; i++) {
+    iv = ivs+i;
+
+    /* Get type of distribution. */
+    iv->type = type_with2ndD(iv, iv+1);
+    
+    /* Compute hat and squeeze for interval */
+    hat_iv(/*left=*/iv, /*right=*/iv+1);
+
+#ifdef DEBUG
+    debug_iv (iv);
+#endif
+  }
+
+#ifdef DEBUG
+  debug_iv (ivs+gen->n_ivs);
+#endif
+
+  /* Compute total areas for initial hat and squeeze. */
+  update_area(gen);
+
+  /* We have to split intervals where the area */
+  /* between hat and squueze is too large. */
+  while (! (gen->A_ht_tot <= rho * gen->A_sq_tot) && (gen->n_ivs < max_intervals)) {
+
+    /* Compute average area. */
+    threshold = 0.99 * (gen->A_ht_tot - gen->A_sq_tot) / gen->n_ivs;
+
+    /* Split all intervals where area between hat and squeeze is too large. */
+    n_ivs_save = gen->n_ivs;
+    for (i=0; i<=n_ivs_save; i++) {
+
+      /* scan through all intervals */
+      iv = ivs+i;
+
+      if ( iv->next < 0 || (iv->A_ht  - iv->A_sq) < threshold) {
+	continue;
+      }
+      if ( gen->n_ivs >= max_intervals) {
+	warning("Tinflex_setup(): maximum number of intervals reached");
+	break;
+      }
+      
+      /* split intervals where area between hat and squeeze is too large. */
+      left = iv;
+      right = ivs + iv->next;
+
+      /* Splitting point for interval (use "arc mean"). */
+      p = arcmean(left->x, right->x);
+
+      /* Create new interval on r.h.s. */
+      ++(gen->n_ivs);
+
+      iv = ivs + gen->n_ivs;
+      iv->x = p;
+      iv->c = left->c;
+      Tfdd (p, gen, iv);
+      iv->type = type_with2ndD(iv, right);
+      hat_iv(/*left=*/iv, /*right=*/right);
+      iv->next = left->next;
+
+      /* Update interval on l.h.s. */
+      left->type = type_with2ndD(left, iv);
+      hat_iv(/*left=*/left, /*right=*/iv);
+      left->next = gen->n_ivs;
+    }
+
+    /* Update total areas. */
+    update_area(gen);
+  }
+
+  /* Return generator object.  */
+  return (gen);
+  
+} /* end of Tinflex_lib_setup_with2ndD() */
+
+/*...........................................................................*/
+
+
+
+TINFLEX_GEN *
+Tinflex_lib_setup_no2ndD (TINFLEX_GEN *gen,
+			    double rho, int max_intervals)
+/*---------------------------------------------------------------------------*/
+/* Setup: compute hat and squeeze for density.                               */
+/* Version that makes use of 2nd derivative.                                 */
+/*---------------------------------------------------------------------------*/
+/*   gen  ... Tinflex generator object                                       */
+/*   rho  ... performance parameter: requested upper bound for ratio         */
+/*            between area below hat and area below squeeze                  */
+/*   max_intervals ... maximal numbers of intervals                          */
+/*---------------------------------------------------------------------------*/
+/* Return: Tfinflex generator object.                                        */
+/*---------------------------------------------------------------------------*/
+{
+  int i;                       /* loop variable */
+  int type;                    /* type of current interval */
+  TINFLEX_IV *ivs;             /* pointer to list of all intervals */
+  TINFLEX_IV *iv;              /* pointer to current and next interval */
+  int n_ivs_save;              /* number of intervals before starting loop */
+  TINFLEX_IV *left, *right;    /* pointer to left (current) and right (next) interval */
+  double threshold;            /* threshold for splitting interval */
+  double p;                    /* splitting point for interval */
+
+  /* --- Check arguments */
+
+  /* done in Tinflex_lib_setup() */
+
+  /* ........................................................................ */
+
+  /* Pointer to table for hat and squeeze. */
+  ivs = gen->ivs;
+
+  /* Determine type of initial intervals. */
+  /* Remark: ivs+gen->n_ivs contains the right boundary */
+  n_ivs_save = gen->n_ivs;
+  for (i=0; i<=n_ivs_save; i++) {
+    iv = ivs+i;
+    if (iv->next < 0) {
+      continue;
+    }
+    
+    /* Get type of distribution. */
+    iv->type = type = type_no2ndD_init(gen, iv, iv+1);
+
+    if (type == type_IIb_IVa__IIa_IVa ||       /* Case (3.3.3) */
+	type == type_IIIa_IVb__IIIb_IVb  ) {   /* Case (4.3.3) */
+      /* we have to split the interval */
+
+      /* Splitting point for interval (use "arc mean"). */
+      p = arcmean(iv->x, (iv+1)->x);
+
+      /* Create new interval on r.h.s. */
+      ++(gen->n_ivs);
+
+      left = iv;
+      iv = ivs + gen->n_ivs;
+      iv->x = p;
+      iv->c = left->c;
+      Tfdd (p, gen, iv);
+      iv->type = (type == type_IIb_IVa__IIa_IVa) ? type_IIa_IVa : type_IIIb_IVb;
+      iv->next = left->next;
+
+      /* Update interval on l.h.s. */
+      left->type = (type == type_IIb_IVa__IIa_IVa) ? type_IIb_IVa : type_IIIa_IVb;
+      left->next = gen->n_ivs;
+    }
+  }
+
+  /* Compute parameters for hat and squeeze for initial intervals. */
+  for (i=0; i <= gen->n_ivs; i++) {
+    iv = ivs+i;
+    if (iv->next > 0L) {
+      hat_iv(/*left=*/iv, /*right=*/ivs+(iv->next));
+    }
+    
+#ifdef DEBUG
+    debug_iv (iv);
+#endif
+  }
+
+  /* Compute total areas for initial hat and squeeze. */
+  update_area(gen);
+
+  /* We have to split intervals where the area */
+  /* between hat and squueze is too large. */
+  while (! (gen->A_ht_tot <= rho * gen->A_sq_tot) && (gen->n_ivs < max_intervals)) {
+
+    /* Compute average area. */
+    threshold = 0.99 * (gen->A_ht_tot - gen->A_sq_tot) / gen->n_ivs;
+
+    /* Split all intervals where area between hat and squeeze is too large. */
+    n_ivs_save = gen->n_ivs;
+    for (i=0; i<=n_ivs_save; i++) {
+
+      /* scan through all intervals */
+      iv = ivs+i;
+
+      if ( iv->next < 0 || (iv->A_ht  - iv->A_sq) < threshold) {
+	continue;
+      }
+      if ( gen->n_ivs >= max_intervals) {
+	warning("Tinflex_setup(): maximum number of intervals reached");
+	break;
+      }
+
+      /* split intervals where area between hat and squeeze is too large. */
+      left = iv;
+      right = ivs + iv->next;
+      type_no2ndD_split(gen, left, right);
+
+      /* compute hat and squeeze */
+      hat_iv(left, /*right=*/ ivs+(left->next));
+      hat_iv(/*left=*/ ivs+(left->next), right);
+    }
+      
+    /* Update total areas. */
+    update_area(gen);
+
+  }
+
+  /* Return generator object.  */
+  return (gen);
+  
+} /* end of Tinflex_lib_setup_no2ndD() */
+
+
 
 /*---------------------------------------------------------------------------*/
 
@@ -1081,7 +1795,7 @@ Tinflex_lib_sample (TINFLEX_GEN *gen, int n)
   int i;                      /* auxiliary loop variable                     */
 
   /* check arguments */
-  if (n<=0) {
+  if (n<0) {
     error("Tinflex_sample(): sample size 'n' must be positive integer"); 
   }
 
@@ -1223,8 +1937,6 @@ Tinflex_lib_sample_double (TINFLEX_GEN *gen)
       z = U * b / (t*t);
       if (fabs(z) > 1.e-6)
 	X = y + (FTinv(c, FT(c, t)+b*U)-a)/b;
-      /* FIXME: why FT() and FTinv() ? */
-      /* X = y + (sqrt(t*t+b*U)-a)/b; */
       else
 	X = x0 + U / t * (1 - z/2 + z*z/2);
     }
@@ -1266,6 +1978,7 @@ Tinflex_lib_sample_double (TINFLEX_GEN *gen)
 /*---------------------------------------------------------------------------*/
 
 #ifdef DEBUG
+
 void
 debug_iv (TINFLEX_IV *iv)
 {

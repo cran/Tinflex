@@ -10,7 +10,7 @@
 
 ## --------------------------------------------------------------------------
 
-Tinflex.setup.C <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
+Tinflex.setup.C <- function(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
   ## -----------------------------------------------------------------------
   ## Setup: compute hat and squeeze for density.
   ## -----------------------------------------------------------------------
@@ -47,27 +47,34 @@ Tinflex.setup.C <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.interval
         max.intervals <- 1001
     }
     
-    if (missing(lpdf) || !is.function(lpdf))
+    if (missing(lpdf) || !is.function(lpdf)) {
         stop ("parameter 'lpdf' missing or invalid")
-    if (missing(dlpdf) || !is.function(dlpdf))
+    }
+    if (missing(dlpdf) || !is.function(dlpdf)) {
         stop ("parameter 'dlpdf' missing or invalid")
-    if (missing(d2lpdf) || !is.function(d2lpdf))
-        stop ("parameter 'd2lpdf' missing or invalid")
+    }
+    if (! (is.function(d2lpdf) || is.null(d2lpdf) ) ) {
+        stop ("parameter 'd2lpdf' is invalid")
+    }
     
-    if (missing(ib))
+    if (missing(ib)) {
         stop ("argument 'ib' is missing, with no default")
-    if (length(ib)<2 || length(ib) > max.intervals / 2)
+    }
+    if (length(ib)<2 || length(ib) > max.intervals / 2) {
         stop ("argument 'ib' invalid")
+    }
     
     ## The boundaries must be sorted.
     ib <- sort(ib)
     
     ## Check parameters for transformation.
-    if (! ( is.numeric(cT) && (length(cT)==1 || length(cT)==length(ib)-1 )) )
+    if (! ( is.numeric(cT) && (length(cT)==1 || length(cT)==length(ib)-1 )) ) {
         stop ("argument 'cT' invalid: its length must equal either 1 or number of intervals")
+    }
     if ((! is.finite(ib[1]) && ! isTRUE(cT[1] > -1.)) ||
-        (! is.finite(ib[length(ib)]) && ! isTRUE(cT[length(cT)] > -1.)) )
+        (! is.finite(ib[length(ib)]) && ! isTRUE(cT[length(cT)] > -1.)) ) {
         stop ("(first and last) entry of argument 'cT' must be greater than -1 for unbounded domains")
+    }
     
     ## ........................................................................
     
@@ -77,7 +84,7 @@ Tinflex.setup.C <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.interval
                   paste("\n                   cT ="),
                   paste(cT,collapse=" | "),
                   paste("\n                  rho =",rho,"\n"))
-    
+
     ## We need an evironment for evaluating R expressions
     lpdf.env=parent.frame()
 
@@ -91,6 +98,7 @@ Tinflex.setup.C <- function(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.interval
         iniv=iniv,         ## initial intervals (for print.Tinflex)
         Acum=NULL,         ## cumulated areas
         gt=NULL,           ## guide table
+        haved2Tf= !is.null(d2lpdf), ## whether 2nd derivative is used (for print.Tinflex)
         Cgen=NULL          ## pointer to external C structure
     )
     class(generator) <- "TinflexC"

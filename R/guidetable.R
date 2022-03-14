@@ -6,42 +6,46 @@
 #############################################################################
 
 make.guidetable.R <- function(params) {
+    
+    ## Get number of interval.
+    n.ivs <- ncol(params)-1
+    
+    ## Allocate memory for guide table.
+    gt <- integer(n.ivs)
+    
+    ## Compute cumulative sums.
+    Acum <- cumsum(params["A.ht", 1:n.ivs])
+    A.ht.tot <- Acum[n.ivs]
+    
+    ## Compute average area for each interval.
+    Astep <- A.ht.tot / n.ivs
+    
+    ## Create hash table (guide table).
+    sum <- 0
+    i <- 1
+    for (j in 1:n.ivs) {
+        while (isTRUE(Acum[i] < sum)) {
+            i <- i+1
+        }
+        if (isTRUE(i > n.ivs)) {
+            break;
+        }
+        gt[j] <- as.integer(i-1)   ## This is required for the C version.
+        sum <- sum + Astep
+    }
+    
+    ## If there has been an round off error,
+    ## we have to complete the guide table.
+    if (j<n.ivs) {
+        for(jj in j:n.ivs) {
+            gt[jj] <- n.ivs
+        }
+    }
+    
+    ## Return cumulative areas and hash table.
+    return(list(Acum=Acum, gt=gt))
 
-  ## Get number of interval.
-  n.ivs <- ncol(params)-1
-
-  ## Allocate memory for guide table.
-  gt <- integer(n.ivs)
-
-  ## Compute cumulative sums.
-  Acum <- cumsum(params["A.ht", 1:n.ivs])
-  A.ht.tot <- Acum[n.ivs]
-
-  ## Compute average area for each interval.
-  Astep <- A.ht.tot / n.ivs
-
-  ## Create hash table (guide table).
-  sum <- 0
-  i <- 1
-  for (j in 1:n.ivs) {
-    while (is.TRUE(Acum[i] < sum))
-      i <- i+1
-    if (is.TRUE(i > n.ivs))
-      break;
-    gt[j] <- as.integer(i-1)   ## This is required for the C version.
-    sum <- sum + Astep
-  }
-  
-  ## If there has been an round off error,
-  ## we have to complete the guide table.
-  if (j<n.ivs) {
-    for(jj in j:n.ivs)
-      gt[jj] <- n.ivs
-  }
-
-  ## Return cumulative areas and hash table.
-  return(list(Acum=Acum, gt=gt))
-}
+}  ## -- end of make.guidetable.R() -- ##
 
 ## --------------------------------------------------------------------------
 

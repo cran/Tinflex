@@ -14,14 +14,14 @@
 }
 
 \usage{
-Tinflex.setup(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
-Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
+Tinflex.setup(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
+Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
 }
 
 \arguments{
   \item{lpdf}{log-density of targent distribution. (function)}
   \item{dlpdf}{first derivative of log-density. (function)}
-  \item{d2lpdf}{second derivative of log-density. (function)}
+  \item{d2lpdf}{second derivative of log-density. (function, optional)}
   \item{ib}{break points for partition of domain of log-density.
     (numeric vector of length greater than 1)}
   \item{cT}{parameter for transformation
@@ -48,18 +48,16 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
   The algorithm uses family
   \ifelse{html}{\out{<i>T<sub>c</sub></i>}}{\eqn{T_c}}
   of transformations, where
+
   \ifelse{html}{\out{
-      <p align="center">
       <table>
-      <tr align="left">
+      <tr>
       <td><i>T<sub>0</sub> = </i>log<i>(x)</i>
       <td width="10"><td>for <i>c=0</i></tr>
-      <tr align="left">
+      <tr>
       <td><i>T<sub>c</sub> = </i>sign<i>(x) x<sup>c</sup></i>
       <td><td>for <i>c!=0</i> </tr>
-      </table>
-      </p>}
-  }{%
+      </table>}}{%
     \deqn{T_c(x) = \left\{\begin{array}{l@{\quad}l}%
       \log(x) & \mbox{for $c=0\,,$}\\
       \mbox{sign}(c)\; x^c & \mbox{for $c\not=0\,.$}
@@ -67,14 +65,14 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
       T_0(x) = log(x)       for c=0,
       T_c(x) = sign(c) x^c  for c!=0.}
   }
-
+  
   Parameter \eqn{c} is given by argument \code{cT}.
   
   The algorithm requires the following input from the user:
   \itemize{
     \item the log-density of the targent distribution, \code{lpdf};
     \item its first derivative \code{dlpdf};
-    \item its second derivative \code{d2lpdf};
+    \item its second derivative \code{d2lpdf} (optionally);
     \item a starting partition \code{ib} of the domain of the target
     distribution such that each subinterval contains at most one
     inflection point of the transformed density;
@@ -102,8 +100,15 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
     \item If the log-density \code{lpdf} has a pole or cusp at some
     point \eqn{x}, then this must be added to the starting partition
     point. Moreover, it has to be counted as inflection point.
+    Moreover, in the corresponding intervals the transformed density
+    must be convex.
   }
 
+  Argument \code{d2lpdf} is optional. If \code{d2lpdf=NULL}, then
+  a variant of the method is used, that determines intervals where the
+  transformed density is concave or convex without means of the second
+  derivative of the log-density.
+  
   Parameter \code{cT} is either a single numeric, that is, the same
   transformation 
   \ifelse{html}{\out{<i>T<sub>c</sub></i>}}{\eqn{T_c}}
@@ -192,7 +197,10 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib, cT=0, rho=1.1, max.intervals=1001)
   Research Report Series / Department of Statistics and Mathematics
   Nr. 110, Department of Statistics and Mathematics, WU Wien,
   \url{https://epub.wu.ac.at/id/eprint/3158}).
-
+  
+  W. \enc{Hörmann}{Hoermann}, and J. Leydold (2022),
+  A Generalized Transformed Density Rejection Algorithm,
+  in preparation.
 }
 
 \seealso{
@@ -223,7 +231,7 @@ d2lpdf <- function(x) { (-alpha*(alpha-1)*abs(x)^(alpha-2)
 ib <- c(-Inf, 0, Inf)
 
 ## Create generator object.
-gen <- Tinflex.setup(lpdf, dlpdf, d2lpdf, ib=c(-Inf,0,Inf), rho=1.1)
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib=c(-Inf,0,Inf), rho=1.1)
 
 ## Print data about generator object.
 print(gen)
@@ -235,6 +243,11 @@ Tinflex.sample(gen, n=10)
 plot(gen, from=-2.5, to=2.5)
 ## ... and in transformed (log) scale.
 plot(gen, from=-2.5, to=2.5, is.trans=TRUE)
+
+## With Version 2.0 the setup also works without providing the
+## second derivative of the log-density
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib=c(-Inf,0,Inf), rho=1.1)
+Tinflex.sample(gen, n=10)
 
 ## -------------------------------------------------------------------
 ## Example 2: Exponential Power Distribution
@@ -255,7 +268,7 @@ d2lpdf <- function(x) { -alpha*(alpha-1)*abs(x)^(alpha-2) }
 ib <- c(-Inf, -(1-alpha)/2, 0, (1-alpha)/2, Inf)
 
 ## Create generator object with c = -0.5.
-gen <- Tinflex.setup(lpdf, dlpdf, d2lpdf, ib=ib, cT=-0.5, rho=1.1)
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib=ib, cT=-0.5, rho=1.1)
 
 ## Print data about generator object.
 print(gen)
@@ -267,6 +280,11 @@ Tinflex.sample(gen, n=10)
 plot(gen, from=-4, to=4)
 ## ... and in transformed (log) scale.
 plot(gen, from=-4, to=4, is.trans=TRUE)
+
+## With Version 2.0 the setup also works without providing the
+## second derivative of the log-density
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib=ib, cT=-0.5, rho=1.1)
+Tinflex.sample(gen, n=10)
 
 ## -------------------------------------------------------------------
 ## Example 3: Generalized Inverse Gaussian Distribution
@@ -286,7 +304,7 @@ ib <- c(0, (3/2*om/(1-la) + 2/9*(1-la)/om), Inf)
 cT <- c(0,-0.5)
 
 ## Create generator object.
-gen <- Tinflex.setup(lpdf, dlpdf, d2lpdf, ib=ib, cT=cT, rho=1.1)
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf, ib=ib, cT=cT, rho=1.1)
 
 ## Print data about generator object.
 print(gen)
@@ -296,6 +314,12 @@ Tinflex.sample(gen, n=10)
 
 ## Inspect hat and squeeze visually in original scale
 plot(gen, from=0, to=5)
+
+## With Version 2.0 the setup also works without providing the
+## second derivative of the log-density
+gen <- Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib=ib, cT=cT, rho=1.1)
+Tinflex.sample(gen, n=10)
+
 }
 
 \keyword{distribution}

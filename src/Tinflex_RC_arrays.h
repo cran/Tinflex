@@ -1,7 +1,7 @@
 /*
  * -- Automatically created from 'setup.R'
- * -- by '../devel/make_Tinflex_RC_arrays_h.R'
- * Fri Jul  5 11:41:12 2019 
+ * -- by './src/scripts/make_Tinflex_RC_arrays_h.R'
+ * Tue Feb  8 23:21:23 2022 
  */
 
 /* Number of data for each interval */
@@ -36,5 +36,6 @@ enum {
 	GEN_INIV = 5,
 	GEN_ACUM = 6,
 	GEN_GT = 7,
+	GEN_HAVED2TF = 8,
 };
 

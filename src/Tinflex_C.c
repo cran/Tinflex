@@ -99,8 +99,14 @@ Tinflex_C_setup (SEXP sexp_obj, SEXP sexp_env,
   params->d2lpdf = sexp_d2lpdf;
   params->env = sexp_env;
 
-  gen = Tinflex_lib_setup (eval_lpdf, eval_dlpdf, eval_d2lpdf, params,
-  			   n_ib, ib, n_c, c, rho, max_intervals);
+  if (sexp_d2lpdf == R_NilValue) {
+    gen = Tinflex_lib_setup (eval_lpdf, eval_dlpdf, NULL, params,
+			     n_ib, ib, n_c, c, rho, max_intervals);
+  }
+  else {
+    gen = Tinflex_lib_setup (eval_lpdf, eval_dlpdf, eval_d2lpdf, params,
+			     n_ib, ib, n_c, c, rho, max_intervals);
+  }
 
   /* make R external pointer and store pointer to structure */
   PROTECT(sexp_gen = R_MakeExternalPtr(gen, Tinflex_C_tag(), sexp_obj));
@@ -135,8 +141,8 @@ Tinflex_C_sample (SEXP sexp_gen, SEXP sexp_n)
 
   /* Extract and check sample size. */
   n = *(INTEGER (AS_INTEGER (sexp_n)));
-  if (n<=0) {
-    error("sample size 'n' must be positive integer");
+  if (n<0) {
+    error("sample size 'n' must be non-negative integer");
   }
 
   gen = R_ExternalPtrAddr(sexp_gen);

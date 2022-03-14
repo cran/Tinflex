@@ -1,4 +1,25 @@
 
+Version 2.1: 2022-03-15
+
+	- internal: fixed issue with HTML code
+
+Version 2.0: 2022-03-15
+
+	- Tinflex.setup() and Tinflex.setup.C():
+	  Argument "d2lpdf" is now optional.
+	  If NULL, then a new variant of the method is used, that
+	  determines intervals where the transformed density is
+	  concave or convex without means of the second derivative
+	  of the log-density.
+
+	- internal: fixed issue with HTML code
+
+
+Version 1.9: 2021-12-14
+
+	- internal: new directory src/scripts
+	
+
 Version 1.8: 2021-11-15
 
 	- Tinflex.setup.C():
