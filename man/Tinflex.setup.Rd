@@ -53,10 +53,11 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
       <table>
       <tr>
       <td><i>T<sub>0</sub> = </i>log<i>(x)</i>
-      <td width="10"><td>for <i>c=0</i></tr>
+      <td>for <i>c=0</i></tr>
       <tr>
       <td><i>T<sub>c</sub> = </i>sign<i>(x) x<sup>c</sup></i>
-      <td><td>for <i>c!=0</i> </tr>
+      &nbsp;&nbsp;&nbsp;&nbsp;
+      <td>for <i>c!=0</i> </tr>
       </table>}}{%
     \deqn{T_c(x) = \left\{\begin{array}{l@{\quad}l}%
       \log(x) & \mbox{for $c=0\,,$}\\

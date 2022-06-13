@@ -1,8 +1,8 @@
 Package: Tinflex
 Type: Package
 Title: A Universal Non-Uniform Random Number Generator
-Version: 2.1
-Date: 2022-03-14
+Version: 2.2
+Date: 2022-06-13
 Author: Josef Leydold, Carsten Botts and Wolfgang H\"ormann 
 Maintainer: Josef Leydold <josef.leydold@wu.ac.at>
 Imports: graphics, methods, stats
@@ -12,6 +12,6 @@ Description: A universal non-uniform random number generator
   differentiable densities.
 License: GPL (>= 2)
 NeedsCompilation: yes
-Packaged: 2022-03-14 22:48:22 UTC; leydold
+Packaged: 2022-06-13 16:15:33 UTC; leydold
 Repository: CRAN
-Date/Publication: 2022-03-14 23:00:02 UTC
+Date/Publication: 2022-06-13 16:40:02 UTC

@@ -125,7 +125,7 @@ Tinflex.sample.C <- function(gen, n=1) {
   ## Return: random sample.
   ## ------------------------------------------------------------------------
 
-  if (class(gen) != "TinflexC") {
+  if (class(gen)[1] != "TinflexC") {
       stop("Argument 'gen' is not of class 'TinflexC'")
   }
 
@@ -143,7 +143,7 @@ Tinflex.C2R <- function(genC) {
     ## Return: object of class 'Tinflex'
     ## ----------------------------------------------------------------------
 
-    if (class(genC) != "TinflexC") {
+    if (class(genC)[1] != "TinflexC") {
         stop("Argument 'gen' is not of class 'TinflexC'")
     }
 

@@ -1,7 +1,13 @@
 
+Version 2.2: 2022-06-10
+
+	- internal: fixed issue with HTML5 code
+
+
 Version 2.1: 2022-03-15
 
-	- internal: fixed issue with HTML code
+	- internal: fixed issue with HTML5 code
+
 
 Version 2.0: 2022-03-15
 
@@ -12,7 +18,7 @@ Version 2.0: 2022-03-15
 	  concave or convex without means of the second derivative
 	  of the log-density.
 
-	- internal: fixed issue with HTML code
+	- internal: fixed issue with HTML5 code
 
 
 Version 1.9: 2021-12-14

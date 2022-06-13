@@ -1,6 +1,6 @@
-0035f1c2ca45fe2d22801ac35b44b173 *DESCRIPTION
+2ae33beca5105612fd62fc24552a0c81 *DESCRIPTION
 db09fdbecd8fe1cd3d7c1e1c91e5df21 *NAMESPACE
-e71e03174ecba2e82c2a3f37f265b815 *NEWS
+e456f2af4e789cc642a484288043626f *NEWS
 91f5e791336167fbf09612091db3f40b *R/T.R
 11c85624a4855cd84c1a5b2cbbe2656f *R/area.R
 ca22606e93cd1b59035142795f155ba7 *R/auxiliary.R
@@ -10,14 +10,14 @@ ca22606e93cd1b59035142795f155ba7 *R/auxiliary.R
 09eeab271a09a9d0bcd9b388861a3feb *R/print.R
 83fb6cca4748d38d0c9088c4e2aa65da *R/sample.R
 9e0095d0e54d5521e18f3ae4c48daa73 *R/setup.R
-418446c7f9ed6bd03ff01ebd2a9ac118 *R/setup_C.R
+8974b96fe1a9f79f677c61b9ded9258f *R/setup_C.R
 f2bacac563ae2fd4c13e4235e120fc18 *R/type.R
 2c290c5127da7e0f5cd66057588dd50e *R/zzz.R
-173308324eef80aad984a932cf6ef8d2 *build/partial.rdb
+1961639f6f4f7f9efffa91b624b3d060 *build/partial.rdb
 ff0d4e47484aaa20631fd11e2ef7cb12 *inst/include/Tinflex_lib.h
-8d4a0e5dbba40d772baea0a48a560546 *man/Tinflex-package.Rd
+bb19052a8030fcb6fd505e6fb97feba0 *man/Tinflex-package.Rd
 79f017a140b7cd20b0456e6695b9b7af *man/Tinflex.sample.Rd
-0274d9cae7d1a575a396e23b72cbd3f9 *man/Tinflex.setup.Rd
+f22c0280d27bf839d1beb26f6d35aa97 *man/Tinflex.setup.Rd
 33fd09d409335b22e551a781e2d8a4ec *man/plot.Tinflex.Rd
 9f4134ee60351824d79bd9c5ab151bc7 *man/print.Tinflex.Rd
 5a004617e69b12ea2bbc53e4e57a9055 *src/Tinflex_C.c
