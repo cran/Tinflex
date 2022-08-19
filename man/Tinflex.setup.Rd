@@ -24,8 +24,7 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
   \item{d2lpdf}{second derivative of log-density. (function, optional)}
   \item{ib}{break points for partition of domain of log-density.
     (numeric vector of length greater than 1)}
-  \item{cT}{parameter for transformation
-    \ifelse{html}{\out{<i>T<sub>c</sub></i>}}{\eqn{T_c}}.
+  \item{cT}{parameter for transformation \eqn{T_c}.
     (numeric vector of length 1 or of length \code{length(ib)-1})}
   \item{rho}{performance parameter:
     requested upper bound for ratio of area below hat to area
@@ -40,32 +39,19 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
   The algorithm is based on the transformed density rejection algorithm
   which is a variant of the acceptance-rejection algorithm where
   the density of the targent distribution is transformed by means of
-  some transformation
-  \ifelse{html}{\out{<i>T<sub>c</sub></i>}}{\eqn{T_c}}.
+  some transformation \eqn{T_c}.
   Hat and squeeze functions of the density are then constructed by means
   of tangents and secants.
 
-  The algorithm uses family
-  \ifelse{html}{\out{<i>T<sub>c</sub></i>}}{\eqn{T_c}}
+  The algorithm uses family \eqn{T_c}
   of transformations, where
 
-  \ifelse{html}{\out{
-      <table>
-      <tr>
-      <td><i>T<sub>0</sub> = </i>log<i>(x)</i>
-      <td>for <i>c=0</i></tr>
-      <tr>
-      <td><i>T<sub>c</sub> = </i>sign<i>(x) x<sup>c</sup></i>
-      &nbsp;&nbsp;&nbsp;&nbsp;
-      <td>for <i>c!=0</i> </tr>
-      </table>}}{%
-    \deqn{T_c(x) = \left\{\begin{array}{l@{\quad}l}%
-      \log(x) & \mbox{for $c=0\,,$}\\
-      \mbox{sign}(c)\; x^c & \mbox{for $c\not=0\,.$}
-      \end{array}\right.}{%
-      T_0(x) = log(x)       for c=0,
-      T_c(x) = sign(c) x^c  for c!=0.}
-  }
+  \deqn{T_c(x) = \left\{\begin{array}{lcl}%
+    \log(x) & \quad & \mbox{for $c=0\,,$}\\
+    \mbox{sign}(c)\; x^c && \mbox{for $c\not=0\,.$}
+    \end{array}\right.}{%
+    T_0(x) = log(x)       for c=0,
+    T_c(x) = sign(c) x^c  for c!=0.}
   
   Parameter \eqn{c} is given by argument \code{cT}.
   
@@ -111,8 +97,7 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
   derivative of the log-density.
   
   Parameter \code{cT} is either a single numeric, that is, the same
-  transformation 
-  \ifelse{html}{\out{<i>T<sub>c</sub></i>}}{\eqn{T_c}}
+  transformation \eqn{T_c}
   is used for all subintervals of the domain,
   or it can be set independently for each of these intervals.
   In the latter case \code{length(cT)} must be equal to the number of
@@ -193,15 +178,22 @@ Tinflex.setup.C(lpdf, dlpdf, d2lpdf=NULL, ib, cT=0, rho=1.1, max.intervals=1001)
   C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2013),
   Transformed Density Rejection with Inflection Points,
   Statistics and Computing 23(2), 251--260,
-  \doi{10.1007/s11222-011-9306-4}
-  (see also 
+  \doi{10.1007/s11222-011-9306-4}.
+  See also 
   Research Report Series / Department of Statistics and Mathematics
-  Nr. 110, Department of Statistics and Mathematics, WU Wien,
-  \url{https://epub.wu.ac.at/id/eprint/3158}).
+  Nr. 110, Department of Statistics and Mathematics,
+  WU Vienna University of Economics and Business,
+  \url{https://epub.wu.ac.at/id/eprint/3158}.
   
   W. \enc{Hörmann}{Hoermann}, and J. Leydold (2022),
   A Generalized Transformed Density Rejection Algorithm,
-  in preparation.
+  in: Advances in Modeling and Simulation, Ch. 14,
+  \doi{10.1007/978-3-031-10193-9_14}, accepted for publication..
+  See also 
+  Research Report Series / Department of Statistics and Mathematics
+  Nr. 135, Department of Statistics and Mathematics, 
+  WU Vienna University of Economics and Business,
+  \url{https://research.wu.ac.at/de/publications/a-generalized-transformed-density-rejection-algorithm}.
 }
 
 \seealso{

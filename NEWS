@@ -1,4 +1,11 @@
 
+Version 2.3: 2022-08-12
+
+	- Updated References
+
+	- internal: fixed issue with new KaTeX support
+
+
 Version 2.2: 2022-06-10
 
 	- internal: fixed issue with HTML5 code

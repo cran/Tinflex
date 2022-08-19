@@ -20,8 +20,8 @@
   \tabular{ll}{
     Package: \tab Tinflex       \cr
     Type:    \tab Package       \cr
-    Version: \tab 2.2           \cr
-    Date:    \tab 2022-06-13    \cr
+    Version: \tab 2.3           \cr
+    Date:    \tab 2022-08-19    \cr
     License: \tab GPL 2 or later\cr
   }
 
@@ -120,15 +120,22 @@
   C. Botts, W. \enc{Hörmann}{Hoermann}, and J. Leydold (2013),
   Transformed Density Rejection with Inflection Points,
   Statistics and Computing 23(2), 251--260,
-  \doi{10.1007/s11222-011-9306-4}
-  (see also 
+  \doi{10.1007/s11222-011-9306-4}.
+  See also 
   Research Report Series / Department of Statistics and Mathematics
-  Nr. 110, Department of Statistics and Mathematics, WU Wien,
-  \url{https://epub.wu.ac.at/id/eprint/3158}).
+  Nr. 110, Department of Statistics and Mathematics,
+  WU Vienna University of Economics and Business,
+  \url{https://epub.wu.ac.at/id/eprint/3158}.
   
   W. \enc{Hörmann}{Hoermann}, and J. Leydold (2022),
   A Generalized Transformed Density Rejection Algorithm,
-  in preparation.
+  in: Advances in Modeling and Simulation, Ch. 14,
+  \doi{10.1007/978-3-031-10193-9_14}, accepted for publication..
+  See also 
+  Research Report Series / Department of Statistics and Mathematics
+  Nr. 135, Department of Statistics and Mathematics, 
+  WU Vienna University of Economics and Business,
+  \url{https://research.wu.ac.at/de/publications/a-generalized-transformed-density-rejection-algorithm}.
 }
 
 \seealso{
