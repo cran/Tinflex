@@ -129,7 +129,7 @@ Tinflex.sample.C <- function(gen, n=1) {
       stop("Argument 'gen' is not of class 'TinflexC'")
   }
 
-  .Call("Tinflex_C_sample", gen$Cgen, n)
+  .Call(C_Tinflex_C_sample, gen$Cgen, n)
 }
 
 ## --------------------------------------------------------------------------

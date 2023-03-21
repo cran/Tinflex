@@ -20,8 +20,8 @@ Tinflex.sample <- function(gen, n=1) {
     ## ------------------------------------------------------------------------
     
     switch(class(gen),
-           "Tinflex"  = .Call("Tinflex_RC_sample", gen, n),
-           "TinflexC" = .Call("Tinflex_C_sample", gen$Cgen, n),
+           "Tinflex"  = .Call(C_Tinflex_RC_sample, gen, n),
+           "TinflexC" = .Call(C_Tinflex_C_sample, gen$Cgen, n),
            stop("Argument 'gen' is invalid")
            )
 }  ## -- Tinflex.sample() -- ##

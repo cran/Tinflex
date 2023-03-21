@@ -1,4 +1,9 @@
 
+Version 2.4: 2023-03-21
+
+	- internal: fixed "DLL requires the use of native symbols" error
+
+
 Version 2.3: 2022-08-12
 
 	- Updated References
@@ -48,7 +53,9 @@ Version 1.8: 2021-11-15
 Version 1.7: 2021-02-08
 
 	- fixed URL in man pages
-	
+
+	- removed dependency on package 'rvgtest'
+
 
 Version 1.6: 2021-02-08
 
@@ -62,13 +69,13 @@ Version 1.6: 2021-02-08
 	  (However, routine Tinflex.sampling() also does work).
 
 	- The C routines are now exported at C level and can be linked
-          into other R packages.
+	  into other R packages.
 
 
 Version 1.5: 2019-05-28
 
-        - Tinflex.setup(): fixed some issues with numeric
-	    underflow/overflow during computation of T(f(x))
+	- Tinflex.setup(): fixed some issues with numeric
+	  underflow/overflow during computation of T(f(x))
 	  
 
 Version 1.4: 2019-05-08
@@ -76,9 +83,9 @@ Version 1.4: 2019-05-08
 	- plot(): added argument 'n' for the number of plot points
 
 	- Tinflex.setup(): the generated generator object now contains
-	     field 'A.sq.tot' for the area below the squeeze
+	  field 'A.sq.tot' for the area below the squeeze
 
-        - Tinflex.setup(): added some checks for final hat function
+	- Tinflex.setup(): added some checks for final hat function
 	
 
 Version 1.3: 2018-06-08

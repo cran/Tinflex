@@ -309,7 +309,7 @@ setup.with2ndD <- function(lpdf, dlpdf, d2lpdf, ib, cT, rho, max.intervals) {
     ## C version:
     Acum <- numeric(n.ivs)
     gt <- integer(n.ivs)
-    A.ht.tot <- .Call("Tinflex_RC_make_guide_table", params, Acum, gt)
+    A.ht.tot <- .Call(C_Tinflex_RC_make_guide_table, params, Acum, gt)
     
     ## Create S3 class that contains generator.
     generator <- list(
@@ -553,7 +553,7 @@ setup.no2ndD <- function(lpdf, dlpdf, ib, cT=0, rho=1.1, max.intervals=1001) {
     ## C version:
     Acum <- numeric(n.ivs)
     gt <- integer(n.ivs)
-    A.ht.tot <- .Call("Tinflex_RC_make_guide_table", params, Acum, gt)
+    A.ht.tot <- .Call(C_Tinflex_RC_make_guide_table, params, Acum, gt)
     
     ## Create S3 class that contains generator.
     generator <- list(
